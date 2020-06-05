@@ -22,11 +22,10 @@ class Zone {
     const ZoneType type; // zone classifier
 
     void AddLink(std::shared_ptr<Zone> newlink);
-	std::string Display(void) {
-		// std::cout << id <<' '<< position.x <<' '
-        //           << position.y <<' '
-        //           << nb_people <<'\n';
-		return std::to_string(id) +' '+std::to_string(position.x) +' '+ std::to_string(position.y) +' '+ std::to_string(nb_people) +'\n';
+	std::string Print(void) {
+		return std::to_string(id) +'\t'
+			 + std::to_string(position.x) +'\t'+ std::to_string(position.y) +'\t'
+			 + std::to_string(nb_people) +'\n';
 	}
 
 

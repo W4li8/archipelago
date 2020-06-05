@@ -12,6 +12,7 @@
 #include <sstream>
 #include <memory>
 
+#include <ctime>
 #include "zones.hpp"
 
 class Archipelago {
@@ -62,44 +63,38 @@ Archipelago::Archipelago(void) {
     SaveFile();
 }
 
+template<class... T>
+bool ParseLineFromFile(std::ifstream& file, T&... args) {
+
+    std::string line;
+    getline(file, line);
+    line.erase(std::find(line.begin(), line.end(), '#'), line.end()); // strip comment
+
+    std::istringstream stream{line}; // parse line for args
+    return (stream >> ... >> args) && !stream.fail();
+}
+
 void Archipelago::OpenFile(void) {
 
     std::ifstream file{"debug/"+ name +".txt"};
-    std::string line;
     if(file.is_open()) {
         int counter = 0, status = 0;
         while(!file.eof()) {
-            std::cout <<"reading number\n";
-            getline(file,line);
-            line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-            std::cout << line << '\n';
-            std::istringstream iss{line};
-            if(iss >> counter) {
-                uint id, nb_people; double x, y;
+            if(ParseLineFromFile(file, counter)) {
                 while(status < NbZoneTypes and counter > 0) {
-                    std::cout <<"reading zone\n";
-                    getline(file,line);
-                    line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-                    std::cout << line << '\n';
-                    std::istringstream iss{line};
-                    if(iss >> id >> x >> y >> nb_people) {
-                        // zones.push_back(Zone(id, ZoneType(status), {x, y}, nb_people));
+                    uint id, nb_people; double x, y;
+                    if(ParseLineFromFile(file, id, x, y, nb_people)) {  // and far from all zones
                         zones.emplace_back(new Zone(id, ZoneType(status), {x, y}, nb_people));
                         nb_zones[status] += 1;
                         counter -= 1;
                     }
                 }
                 while(status == NbZoneTypes and counter > 0) {
-                    std::cout <<"reading link\n";
                     uint id1, id2;
-                    getline(file,line);
-                    line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-                    std::cout << line << '\n';
-                    std::istringstream iss{line};
-                    if(iss >> id1 >> id2)
+                    if(ParseLineFromFile(file, id1, id2))
                     for(size_t i{0}, j{0}; i < NbZoneTypes; ++i) {
                         if(zones[i]->id == id1 or zones[i]->id == id2) {
-                            if(j != i) {
+                            if(j != i) { //TODO: and far from all zones
                                 zones[i]->AddLink(zones[j]); // checks if already linked
                                 zones[j]->AddLink(zones[i]); // redundant check
                                 break;
@@ -116,21 +111,30 @@ void Archipelago::OpenFile(void) {
         file.close();
     }
 }
-
 void Archipelago::SaveFile(void) {
+
     std::ofstream file{"debug/"+ name +"0.txt"};
-    file <<"# last edit: "<<"xx.xx.xxxx at xx:xx:xx"<<"\n\n";
-    file << std::to_string(nb_zones[0]) +" # nbResidentialAreas\n";
+
+    time_t clock = time(0);
+    file <<"# "<< ctime(&clock) <<"\n";
+
+    file <<"\n"<< std::to_string(nb_zones[ResidentialArea]) +" # nbResidentialAreas\n";
     for(int i{0}; i < nb_zones[0]; ++i) {
-        file << zones[i]->Display();
-    }file << '\n';
-    file << std::to_string(nb_zones[1]) +" nbTransportHubs\n";
+        file << zones[i]->Print();
+    }
+
+    file <<"\n"<< std::to_string(nb_zones[TransportHub]) +" # nbTransportHubs\n";
     for(int i{nb_zones[0]}; i < nb_zones[1] + nb_zones[0]; ++i) {
-        file << zones[i]->Display();
-    }file << '\n';
-    file << std::to_string(nb_zones[2]) +" nbProductionZones\n";
+        file << zones[i]->Print();
+    }
+
+    file <<"\n"<< std::to_string(nb_zones[ProductionZone]) +" # nbProductionZones\n";
     for(int i{nb_zones[1] + nb_zones[0]}; i < nb_zones[2] + nb_zones[1] + nb_zones[0]; ++i) { //make sum until index function
-        file << zones[i]->Display();
-    }file << '\n';
+        file << zones[i]->Print();
+    }
+
+    file <<"\n"<< std::to_string(0) +" # nbLinks ???\n";
+
+    //print links
 
 }
