@@ -14,19 +14,21 @@
 
 #include <ctime>
 #include "zones.hpp"
+#include "gui.hpp"
 
 class Archipelago {
 
   public: // constructors etc.
+    Archipelago(int argc, char *argv[]);
     Archipelago(void);
    ~Archipelago(void) = default;
 
-  public: // public methods
+  public:
     void OpenFile(void);
     void SaveFile(void);
     void Edit(void); //or design
 
-  private: // private fields
+  private:
     std::string name; // city name, also used as file name
 
     std::vector< std::vector<uint8_t> > adj_matrix; // adjacency matrix of a weighted directed graph
@@ -38,9 +40,11 @@ class Archipelago {
 
     // std::vector<Zone> zones;
     // UserInterface gui;
-
+    UserInterface app;
+    void Draw(void);
 //  private: // private methods
-
+    bool SpacePermits(const Zone& z0);
+    bool SpacePermits(const Zone& z1, const Zone& z2);
 
 };
 
@@ -49,18 +53,24 @@ class Archipelago {
 //  ==============================================================================  //
 
 auto main(int argc, char *argv[]) -> int {
-    Archipelago city;
+    Archipelago city;// {argc, argv};
+    Coord P{1,0}, A{0,1}, B{2,49};
+    DistancePoint2Line(P,A,B);
 }
 
 //  ==============================================================================  //
 
 #include <iostream>
-Archipelago::Archipelago(void) {
+Archipelago::Archipelago(void)
+: app{"Archipelago"} {}
+
+Archipelago::Archipelago(int argc, char *argv[]): app{"Archipel"} {
     std::cout << "Select city: ";
     std::cin  >> name;
 
     OpenFile();
     SaveFile();
+    ;
 }
 
 template<class... T>
@@ -77,43 +87,50 @@ bool ParseLineFromFile(std::ifstream& file, T&... args) {
 void Archipelago::OpenFile(void) {
 
     std::ifstream file{"debug/"+ name +".txt"};
-    if(file.is_open()) {
-        int counter = 0, status = 0;
-        while(!file.eof()) {
-            if(ParseLineFromFile(file, counter)) {
-                while(status < NbZoneTypes and counter > 0) {
-                    uint id, nb_people; double x, y;
-                    if(ParseLineFromFile(file, id, x, y, nb_people)) {  // and far from all zones
+    if(!file.is_open()) return ;
+
+    int counter = 0, status = 0;
+    while(!file.eof()) {
+        if(ParseLineFromFile(file, counter)) {
+            while(status < NbZoneTypes and counter > 0) {
+                uint id, nb_people; double x, y;
+                if(ParseLineFromFile(file, id, x, y, nb_people)) {  // and far from all zones
+                    if(SpacePermits({id, ZoneType(status), {x, y}, nb_people})) {
                         zones.emplace_back(new Zone(id, ZoneType(status), {x, y}, nb_people));
                         nb_zones[status] += 1;
-                        counter -= 1;
                     }
+                    counter -= 1;
                 }
-                while(status == NbZoneTypes and counter > 0) {
-                    uint id1, id2;
-                    if(ParseLineFromFile(file, id1, id2))
-                    for(size_t i{0}, j{0}; i < NbZoneTypes; ++i) {
+            }
+            while(status == NbZoneTypes and counter > 0) {
+                uint id1, id2;
+                if(ParseLineFromFile(file, id1, id2)) {
+                    for(int i{0}, j{-1}; i < zones.size(); ++i) {
                         if(zones[i]->id == id1 or zones[i]->id == id2) {
-                            if(j != i) { //TODO: and far from all zones
-                                zones[i]->AddLink(zones[j]); // checks if already linked
-                                zones[j]->AddLink(zones[i]); // redundant check
+                            if(j >= 0) {
+                                if(SpacePermits(*zones[i], *zones[j])) {
+                                    zones[i]->AddLink(zones[j]); // i -> j
+                                    zones[j]->AddLink(zones[i]); // j -> i
+                                }
                                 break;
                             } else {
                                 j = i;
                             }
                         }
                     }
-                    counter -= 1; // will ignore entry if an id is incorrect
                 }
-                status += 1;
+                counter -= 1; // will ignore entry if an id is incorrect
             }
+            status += 1;
         }
-        file.close();
     }
+    file.close();
+    app.RenameWindow("Archipelago - " + name);
 }
 void Archipelago::SaveFile(void) {
 
     std::ofstream file{"debug/"+ name +"0.txt"};
+    if(!file.is_open()) return ;
 
     time_t clock = time(0);
     file <<"# "<< ctime(&clock) <<"\n";
@@ -135,6 +152,54 @@ void Archipelago::SaveFile(void) {
 
     file <<"\n"<< std::to_string(0) +" # nbLinks ???\n";
 
-    //print links
+    //TODO: print links
 
+}
+
+bool Archipelago::SpacePermits(const Zone& z0) {
+
+    for(auto& zone : zones) {
+        if(zone->id != z0.id && DistancePoint2Point(zone->getCenter(), z0.getCenter()) < (zone->getRadius() + z0.getRadius())) {
+            std::cout <<"ERROR - Zones "<< zone->id <<" and "<< z0.id <<" overlap.\n";
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Archipelago::SpacePermits(const Zone& z1, const Zone& z2) {
+
+    for(auto& zone : zones) {
+        if(zone->id != z1.id && zone->id != z2.id && DistancePoint2Line(zone->getCenter(), z1.getCenter(), z2.getCenter()) < zone->getRadius()) {
+            std::cout <<"ERROR - Link between zones " << z1.id <<" and "<< z2.id
+                      <<" passes through zone "<< zone->id <<".\n"<<DistancePoint2Line(zone->getCenter(), z1.getCenter(), z2.getCenter())<<'\n'<<zone->getRadius()<<'\n';
+            return false;
+        }
+    }
+    return true;
+}
+
+constexpr double sqrt2 = 1.4142135624;
+void Archipelago::Draw(void) {
+    app.DrawLine({-2,2},{-1,3});
+    for(auto& zone : zones) {
+        switch(zone->type) {
+          case ResidentialArea:
+            // app.DrawCircle(zone->getCenter(), zone->getRadius());
+            break;
+          case TransportHub:
+            // app.DrawCircle(zone->getCenter(), zone->getRadius());
+            // app.DrawLine(zone->getCenter() + {0.5*sqrt2, 0.5*sqrt2}*zone->getRadius(), zone->getCenter() + {-0.5*sqrt2, -0.5*sqrt2}*zone->getRadius());
+            // app.DrawLine(zone->getCenter() + {1, 0}*zone->getRadius(), zone->getCenter() + {-1, 0}*zone->getRadius());
+            // app.DrawLine(zone->getCenter() + {0, 1}*zone->getRadius(), zone->getCenter() + {0, -1}*zone->getRadius());
+            // app.DrawLine(zone->getCenter() + {-0.5*sqrt2, 0.5*sqrt2}*zone->getRadius(), zone->getCenter() + {0.5*sqrt2, -0.5*sqrt2}*zone->getRadius());
+            break;
+          case ProductionZone:
+            // app.DrawCircle(zone->getCenter(), zone->getRadius());
+            // app.DrawRectangle(zone->getCenter() + ({0.75, 0.125}*(-0.5)*zone->getRadius()), zone->getCenter() + Coord((0.5)*zone->getRadius()*{0.75, 0.125}));
+            break;
+          default:;
+            // no other
+        }
+    }
 }
