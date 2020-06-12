@@ -6,7 +6,31 @@
 #include <vector>
 #include "archipelago.hpp"
 
+void DrawLine(const Cairo::RefPtr<Cairo::Context>& cr, Coord A, Coord B) {
+	cr->save();
+    cr->set_source_rgb(1, 0,0 );
+	cr->move_to(A.x, A.y);
+	cr->line_to(B.x, B.y);
+	cr->stroke();
+    cr->restore();
+}
 
+void DrawCircle(const Cairo::RefPtr<Cairo::Context>& cr, Coord center, double radius) {
+    cr->save();
+    cr->set_source_rgb(0, 0, 0);
+	cr->arc(center.x, center.y, radius, 0.0, 2*M_PI);
+    cr->stroke();
+    cr->restore();
+}
+void DrawRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Coord cornerTL, double width, double height) {
+	cr->save();
+    cr->set_source_rgb(0, 0, 0);
+    cr->rectangle(cornerTL.x, cornerTL.y, width, height);
+    cr->set_source_rgb(1, 1, 1);    // partially translucent
+    cr->fill_preserve();
+    cr->restore();
+    cr->stroke();
+}
 
 
 Archipelago::Archipelago(void) {
@@ -26,13 +50,12 @@ bool ParseLineFromFile(std::ifstream& file, T&... args) {
 }
 
 #include <iostream>
-void Archipelago::OpenFile(void) {
-    std::cout << "Select city: ";
-    std::cin  >> name;
-    std::ifstream file{"debug/"+ name +".txt"};
+void Archipelago::OpenFile(std::string filename) {
+    Reset();
+
+    std::ifstream file{filename};
     if(!file.is_open()) return ;
 
-    // Archipelago::gui.setTitle("Archipelago - " + name);
     int counter = 0, status = 0;
     while(!file.eof()) {
         if(ParseLineFromFile(file, counter)) {
@@ -49,12 +72,14 @@ void Archipelago::OpenFile(void) {
             while(status == NbZoneTypes and counter > 0) {
                 uint id1, id2;
                 if(ParseLineFromFile(file, id1, id2)) {
-                    for(int i{0}, j{-1}; i < Archipelago::zones.size(); ++i) {
-                        if(Archipelago::zones[i]->id == id1 or Archipelago::zones[i]->id == id2) {
+                    for(int i{0}, j{-1}; i < zones.size(); ++i) {
+                        if(zones[i].id == id1 or zones[i].id == id2) {
                             if(j >= 0) {
-                                if(SpacePermitsLink(*Archipelago::zones[i], *Archipelago::zones[j])) {
-                                    Archipelago::zones[i]->AddLink(Archipelago::zones[j]); // i -> j
-                                    Archipelago::zones[j]->AddLink(Archipelago::zones[i]); // j -> i
+                                if(SpacePermitsLink(zones[i], zones[j])) {
+                                    links[i][j] = 1;
+                                    links[j][i] = 1;
+                                    // zones[i]->AddLink(zones[j]); // i -> j
+                                    // zones[j]->AddLink(zones[i]); // j -> i
                                 }
                                 break;
                             } else {
@@ -70,9 +95,10 @@ void Archipelago::OpenFile(void) {
     }
     file.close();
 }
-void Archipelago::SaveFile(void) {
+#define watch(x) (#x) // return strin name
+void Archipelago::SaveFile(std::string filename) {
 
-    std::ofstream file{"debug/"+ name +"0.txt"};
+    std::ofstream file{filename};
     if(!file.is_open()) return ;
 
     time_t clock = time(0);
@@ -124,28 +150,39 @@ bool Archipelago::SpacePermitsLink(const Zone& z1, const Zone& z2) {
 
 
 
-constexpr double sqrt2 = 1.4142135624;
-void Archipelago::Draw(void) {
-        // gui.DrawLine({-2,2},{-1,3});
-    for(auto& zone : Archipelago::zones) {
+
+bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
+    if(zones.empty()) return 1;
+    for(auto& zone : zones) {
+        Coord tmp{100,100},c{zone->getCenter()+tmp}; double r{zone->getRadius()};
         switch(zone->type) {
-          case ResidentialArea:
-            // gui.DrawCircle(zone->getCenter(), zone->getRadius());
+          case ResidentialArea: std::cout<<"R\n";
+            DrawCircle(pencil, c, r);
             break;
-          case TransportHub:
-            // gui.DrawCircle(zone->getCenter(), zone->getRadius());
-            // gui.DrawLine(zone->getCenter() + {0.5*sqrt2, 0.5*sqrt2}*zone->getRadius(), zone->getCenter() + {-0.5*sqrt2, -0.5*sqrt2}*zone->getRadius());
-            // gui.DrawLine(zone->getCenter() + {1, 0}*zone->getRadius(), zone->getCenter() + {-1, 0}*zone->getRadius());
-            // gui.DrawLine(zone->getCenter() + {0, 1}*zone->getRadius(), zone->getCenter() + {0, -1}*zone->getRadius());
-            // gui.DrawLine(zone->getCenter() + {-0.5*sqrt2, 0.5*sqrt2}*zone->getRadius(), zone->getCenter() + {0.5*sqrt2, -0.5*sqrt2}*zone->getRadius());
+          case TransportHub: std::cout<<"T\n";
+            DrawLine(pencil, {c.x + r, c.y}, {c.x - r, c.y});
+            DrawLine(pencil, {c.x + M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x - M_SQRT1_2*r, c.y - M_SQRT1_2*r});
+            DrawLine(pencil, {c.x, c.y + r}, {c.x, c.y - r});
+            DrawLine(pencil, {c.x - M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x + M_SQRT1_2*r, c.y - M_SQRT1_2*r});
+            DrawCircle(pencil, c, r);
             break;
-          case ProductionZone:
-            // gui.DrawCircle(zone->getCenter(), zone->getRadius());
-            // gui.DrawRectangle(zone->getCenter() + ({0.75, 0.125}*(-0.5)*zone->getRadius()), zone->getCenter() + Coord((0.5)*zone->getRadius()*{0.75, 0.125}));
+          case ProductionZone:std::cout<<"P\n";
+            DrawCircle(pencil, c, r);
+            pencil->set_source_rgb(1, 0.0, 0.0);    // partially translucent
+            pencil->fill_preserve();
+            DrawRectangle(pencil, {c.x - 0.7*r, c.y - 0.12*r}, 1.4*r, 0.24*r); // change sign after ok cordintes
+            pencil->set_source_rgb(1, 1, 1);    // partially translucent
+            pencil->fill();
             break;
           default:;
             // no other
         }
     }
-    // gtk_widget_queue_draw();
+    return 1;
+}
+
+
+void Archipelago::Reset(void) {
+    zones.clear();
+    links.clear();
 }

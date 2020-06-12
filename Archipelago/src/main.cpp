@@ -1,22 +1,12 @@
 #include "archipelago.hpp"
 #include <gtkmm.h>
 
-  //Tree model columns:
-  class ModelColumns : public Gtk::TreeModel::ColumnRecord
-  {
-  public:
-
-    ModelColumns()
-    { add(m_col_id); add(m_col_name); }
-
-    Gtk::TreeModelColumn<int> m_col_id;
-    Gtk::TreeModelColumn<Glib::ustring> m_col_name;
-  };
-
-  ModelColumns m_Columns;
-
-ModelColumns m_columns;
-
+void setMargin(Gtk::Widget& widget, uint top, uint right, uint bottom, uint left) {
+	widget.set_margin_top(top);
+	widget.set_margin_right(right);
+	widget.set_margin_bottom(bottom);
+	widget.set_margin_left(left);
+}
 class ArchipelagoUI : public Gtk::Window {
 
   public: // constructors etc.
@@ -28,69 +18,92 @@ class ArchipelagoUI : public Gtk::Window {
     void setWindowSize(uint width, uint height) { Gtk::Window::resize(width, height); }
 
 	Gtk::Grid layout;
-	Gtk::HBox controls, drawing, console;
+	Gtk::HBox controls;
 
-  struct FileIO { // UI controls
-    Gtk::Label  file{"File:"};
+    Gtk::Label  file{"File"};
     Gtk::Entry  filename;
     Gtk::Button open{"Open"};
     Gtk::Button save{"Save"};
-  } file_io;
 
-  struct Editor {
-    Gtk::Label    status; // add/rm text
-    Gtk::ComboBox elements;
-    Gtk::Button   modifier; // md status
-  } editor;
+	std::string getFilename(void) { return filename.get_text(); }
 
-  struct Rating {
-    Gtk::Label  performance;
-  } rating;
+	// FileIO(Gtk::HBox& layout) {
+	// 	layout.pack_start(file);
+	// 	layout.pack_start(filename);
+	// 	layout.pack_start(open);
+	// 	layout.pack_start(save);
+	// 	open.set_focus_on_click(1);
+	// 	setMargin(file, 0, 10, 0, 10);
+	// 	setMargin(filename, 1, 0, 1, 0);
+	// 	setMargin(open, 1, 2, 1, 2);
+	// 	setMargin(save, 1, 0, 1, 0);
+	// }
+
+    Gtk::Label  status{"Add/Remove"}; // add/rm text
+    Gtk::ComboBoxText elements;
+    Gtk::Button modifier{"+/–"}; // md status
+
+    Gtk::Label rating{"ENJ: XXX, CI: XXX, MTA: XXX !"};
 
   private: // Archipelago
     Archipelago model;
 
   private: // UI console
     Gtk::Label  messages;
+
+
+  void OpenFile_cb(void);
+  void SaveFile_cb(void);
 };
+
+void ArchipelagoUI::OpenFile_cb(void) {
+	model.OpenFile(getFilename());
+	setWindowTitle("Archipelago - " + getFilename());
+}
+void ArchipelagoUI::SaveFile_cb(void) {
+	model.SaveFile(getFilename());
+}
 
 ArchipelagoUI::ArchipelagoUI() {
 
     setWindowTitle("Archipelago - Empty");
     setWindowSize(400,400);
 
-    file_io.file.set_margin_left(10);
 	controls.set_vexpand(0);
     // file.set_label("File: ");
-    file_io.file.set_hexpand(); //set_valign also
-    controls.pack_start(file_io.file);
-    controls.pack_start(file_io.filename);
-    // open.set_label("Open");
-    controls.pack_start(file_io.open);
-    // save.set_label("Save");
-    controls.pack_start(file_io.save);
-    editor.status.set_label("add/remove");
-    controls.pack_start(editor.status);
-    editor.elements.set_model(Gtk::ListStore::create(m_Columns));
-    controls.pack_start(editor.elements);
-    editor.modifier.set_label("+/–");
-    controls.pack_start(editor.modifier);
+    file.set_hexpand(); //set_valign also
+    controls.pack_start(file);
+    controls.pack_start(filename); filename.set_text("debug/success/S02.txt");
+    controls.pack_start(open);
+    controls.pack_start(save);
+	open.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::OpenFile_cb));
+	save.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::SaveFile_cb));
+
+    status.set_label("add/remove");
+    controls.pack_start(status);
+    // elements.set_model(Gtk::ListStore::create(m_Columns));
+    elements.append("A");
+    elements.append("B");
+    elements.append("C");
+    controls.pack_start(elements);
+    modifier.set_label("+/–");
+    controls.pack_start(modifier);
     // performance.set_label("label");
-    controls.pack_start(rating.performance);
+    controls.pack_start(rating);
 
     model.set_size_request(400,400);
     model.set_vexpand();
     model.set_hexpand();
-    drawing.pack_start(model);
+    // drawing.pack_start(model);
 
-  	console.set_vexpand(0);
+  	messages.set_vexpand(0);
     messages.set_label("msg");
     messages.set_hexpand();
-    console.pack_start(messages);
+    // console.pack_start(messages);
 
 	layout.attach(controls, 0, 0);
-    layout.attach(drawing, 0, 1);
-	layout.attach(console, 0, 2);
+	layout.attach(model, 0, 1);
+	layout.attach(messages, 0, 2);
 
 	Gtk::Window::add(layout);
 	Gtk::Window::show_all();

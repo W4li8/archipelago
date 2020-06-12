@@ -13,18 +13,18 @@ using VectorOfPointers = std::vector< std::shared_ptr<T> >;
 enum ZoneType { ResidentialArea, TransportHub, ProductionZone, NbZoneTypes };
 
 struct Coord {
-	double x, y;
+    double x, y;
 
-	Coord operator+(const Coord& other) {
-		return {x + other.x, y + other.y};
+    Coord operator+(const Coord& other) {
+        return {x + other.x, y + other.y};
     }
 
-	Coord operator*(double nb) {
-        return {x*nb, y*nb};
+    Coord operator*(const double& nb) {
+         return {x*nb, y*nb};
     }
-	// Coord operator=(const Coord& other) {
-	// 	return other;
-	// }
+    // Coord operator=(const Coord& other) {
+    // 	return other;
+    // }
 };
 
 
