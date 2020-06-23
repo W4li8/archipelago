@@ -1,4 +1,5 @@
 #include <gtkmm/drawingarea.h>
+#include <gtkmm/gesturezoom.h>
 #include "zones.hpp"
 #include <memory.h>
 #include <sstream>
@@ -6,93 +7,124 @@
 #include <vector>
 #include "archipelago.hpp"
 
-void DrawLine(const Cairo::RefPtr<Cairo::Context>& cr, Coord A, Coord B) {
+using uint = unsigned int;
+
+struct Color {
+    Color(int red, int green, int blue, double alpha = 1.0)
+    : red{double(red)/255}, green{double(green)/255}, blue{double(blue)/255}, alpha{alpha} {}
+
+    double red, green, blue, alpha;
+};
+void DrawLine(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D A, Coord2D B) {
 	cr->save();
-    cr->set_source_rgb(1, 0,0 );
+    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
 	cr->move_to(A.x, A.y);
-	cr->line_to(B.x, B.y);
+    cr->line_to(B.x, B.y);
 	cr->stroke();
     cr->restore();
 }
 
-void DrawCircle(const Cairo::RefPtr<Cairo::Context>& cr, Coord center, double radius) {
+void DrawCircle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D center, double radius) {
     cr->save();
-    cr->set_source_rgb(0, 0, 0);
+    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
 	cr->arc(center.x, center.y, radius, 0.0, 2*M_PI);
     cr->stroke();
     cr->restore();
 }
-void DrawRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Coord cornerTL, double width, double height) {
+void FillCircle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D center, double radius) {
+    cr->save();
+    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
+	cr->arc(center.x, center.y, radius, 0.0, 2*M_PI);
+    cr->fill();
+    cr->restore();
+}
+void DrawRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D cornerTL, double width, double height) {
 	cr->save();
-    cr->set_source_rgb(0, 0, 0);
+    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
     cr->rectangle(cornerTL.x, cornerTL.y, width, height);
-    cr->set_source_rgb(1, 1, 1);    // partially translucent
+    cr->stroke();
+    cr->restore();
+}
+void FillRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D cornerTL, double width, double height) {
+	cr->save();
+    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
+    cr->rectangle(cornerTL.x, cornerTL.y, width, height);
     cr->fill_preserve();
     cr->restore();
-    cr->stroke();
 }
 
 
 Archipelago::Archipelago(void) {
-    // OpenFile();
+    zoom = 1;
+    scale = 1;
+    xoffset = 0; yoffset = 0;
+    add_events(Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK | Gdk::POINTER_MOTION_MASK | Gdk::SCROLL_MASK  | Gdk::SMOOTH_SCROLL_MASK);
 
+      m_GestureZoom = Gtk::GestureZoom::create(*this);
+  m_GestureZoom->set_propagation_phase(Gtk::PHASE_CAPTURE);
+  m_GestureZoom->signal_scale_changed().connect(sigc::mem_fun(*this, &Archipelago::zoomfn));
 }
+
 
 template<class... T>
 bool ParseLineFromFile(std::ifstream& file, T&... args) {
-
     std::string line;
     getline(file, line);
+
     line.erase(std::find(line.begin(), line.end(), '#'), line.end()); // strip comment
 
     std::istringstream stream{line}; // parse line for args
     return (stream >> ... >> args) && !stream.fail();
 }
 
+// std::string StripPathFromFileName(std::string filename) {
+//     filename.erase(filename.begin(), std::find(filename.begin(), filename.end(), '/')); // strip directory
+//     filename.erase(std::find(filename.begin(), filename.end(), '.'), filename.end()); // strip extension
+// }
+
 #include <iostream>
 void Archipelago::OpenFile(std::string filename) {
+
     Reset();
 
     std::ifstream file{filename};
     if(!file.is_open()) return ;
-
-    int counter = 0, status = 0;
-    while(!file.eof()) {
-        if(ParseLineFromFile(file, counter)) {
-            while(status < NbZoneTypes and counter > 0) {
-                uint id, nb_people; double x, y;
+    // std::cout<<"openfile\n";
+    uint idtype{0};
+    while(!file.eof() && idtype < ZoneType::NbZoneTypes) {
+        uint zones2read{0};
+        if(ParseLineFromFile(file, zones2read)) {
+            uint id, nb_people;
+            double x, y;
+            while(!file.eof() && zones2read) {
                 if(ParseLineFromFile(file, id, x, y, nb_people)) {  // and far from all zones
-                    if(SpacePermitsZone({id, ZoneType(status), {x, y}, nb_people})) {
-                        Archipelago::zones.emplace_back(new Zone(id, ZoneType(status), {x, y}, nb_people));
-                        nb_zones[status] += 1;
+                    if(SpacePermitsZone({x, y}, sqrt(nb_people))) {
+                        CreateZone({id, ZoneType(idtype), {x, y}, nb_people});
+                        // std::cout<<"create zone "<<id<<'\n';
                     }
-                    counter -= 1;
+                    zones2read -= 1;
                 }
             }
-            while(status == NbZoneTypes and counter > 0) {
-                uint id1, id2;
-                if(ParseLineFromFile(file, id1, id2)) {
-                    for(int i{0}, j{-1}; i < zones.size(); ++i) {
-                        if(zones[i].id == id1 or zones[i].id == id2) {
-                            if(j >= 0) {
-                                if(SpacePermitsLink(zones[i], zones[j])) {
-                                    links[i][j] = 1;
-                                    links[j][i] = 1;
-                                    // zones[i]->AddLink(zones[j]); // i -> j
-                                    // zones[j]->AddLink(zones[i]); // j -> i
-                                }
-                                break;
-                            } else {
-                                j = i;
-                            }
-                        }
-                    }
-                }
-                counter -= 1; // will ignore entry if an id is incorrect
-            }
-            status += 1;
+            idtype += 1;
         }
     }
+    while(!file.eof() && idtype == ZoneType::NbZoneTypes) {
+        uint links2read{0};
+        if(ParseLineFromFile(file, links2read)) {
+            uint id1, id2;
+            while(!file.eof() && links2read) {
+                if(ParseLineFromFile(file, id1, id2)) {
+                    if(LinkAllowed(id1, id2) and SpacePermitsLink(id1, id2)) {
+                        ConnectZones(zones.at(id1), zones.at(id2));
+                        // std::cout<<"link zones "<<id1<<' '<<id2<<'\n';
+                    }
+                    links2read -= 1; // will ignore entry if an id is incorrect
+                }
+            }
+            idtype += 1;
+        }
+    }
+    // std::cout<<zones.size()<<links.size()<<"openend\n";
     file.close();
 }
 #define watch(x) (#x) // return strin name
@@ -102,82 +134,173 @@ void Archipelago::SaveFile(std::string filename) {
     if(!file.is_open()) return ;
 
     time_t clock = time(0);
-    file <<"# "<< ctime(&clock) <<"\n";
+    file <<"# "<< ctime(&clock);
 
-    file <<"\n"<< std::to_string(nb_zones[ResidentialArea]) +" # nbResidentialAreas\n";
-    for(int i{0}; i < nb_zones[0]; ++i) {
-        file << Archipelago::zones[i]->Print();
+    int idtype{-1};
+    for(auto& [key, zone] : zones) {
+        if(zone.type != ZoneType(idtype) && idtype < ZoneType::NbZoneTypes) {
+            switch(++idtype) {
+              case ProductionZone:  file <<"\n# Production Zones\n"; break;
+              case ResidentialArea: file <<"\n# Residential Areas\n"; break;
+              case TransportHub:    file <<"\n# Transport Hubs\n"; break;
+              default:;
+            }
+            file << nb_zones[idtype] <<'\n';
+        }
+        file <<'\t'<< zone <<'\n';
     }
-
-    file <<"\n"<< std::to_string(nb_zones[TransportHub]) +" # nbTransportHubs\n";
-    for(int i{nb_zones[0]}; i < nb_zones[1] + nb_zones[0]; ++i) {
-        file << Archipelago::zones[i]->Print();
+    file <<"\n# Links\n" << nb_links <<'\n';
+    for(auto& link : links) {
+        file <<'\t'<< link.first <<' '<< link.second <<'\n';
     }
-
-    file <<"\n"<< std::to_string(nb_zones[ProductionZone]) +" # nbProductionZones\n";
-    for(int i{nb_zones[1] + nb_zones[0]}; i < nb_zones[2] + nb_zones[1] + nb_zones[0]; ++i) { //make sum until index function
-        file << Archipelago::zones[i]->Print();
-    }
-
-    file <<"\n"<< std::to_string(0) +" # nbLinks ???\n";
-
-    //TODO: print links
-
+    file.close();
 }
+// put msg in calling fn
+bool Archipelago::SpacePermitsZone(Coord2D center, double radius) {
 
-bool Archipelago::SpacePermitsZone(const Zone& z0) {
-
-    for(auto& zone : Archipelago::zones) {
-        if(zone->id != z0.id && DistancePoint2Point(zone->getCenter(), z0.getCenter()) < (zone->getRadius() + z0.getRadius())) {
-            std::cout <<"ERROR - Zones "<< zone->id <<" and "<< z0.id <<" overlap.\n";
+    for(auto& [key, zone] : zones) {
+        if(DistancePoint2Point(zone.getCenter(), center) < (zone.getRadius() + radius)) {
+            std::cout <<"ERROR - Zones "<< key <<" and "<< center.x<<' '<<center.y <<" overlap."<<DistancePoint2Point(zone.getCenter(), center)<<"\n";
             return false;
         }
     }
     return true;
 }
 
-bool Archipelago::SpacePermitsLink(const Zone& z1, const Zone& z2) {
+void Archipelago::CreateZone(const Zone& z0) {
+    zones.emplace(z0.id, z0);
+    nb_zones[z0.type] += 1;
+}
 
-    for(auto& zone : Archipelago::zones) {
-        if(zone->id != z1.id && zone->id != z2.id && DistancePoint2Line(zone->getCenter(), z1.getCenter(), z2.getCenter()) < zone->getRadius()) {
-            std::cout <<"ERROR - Link between zones " << z1.id <<" and "<< z2.id
-                      <<" passes through zone "<< zone->id <<".\n";
+void Archipelago::DestroyZone(Zone& z0) {
+
+    for(auto& [key, zone] : zones) {
+        zone.RemoveLink(z0.id);
+    }
+    nb_zones[z0.type] -= 1;
+    zones.erase(z0.id);
+
+}
+
+
+// put msg in calling fn
+bool Archipelago::SpacePermitsLink(uint id1, uint id2) {
+
+    for(auto& [key, zone] : zones) {
+        if(key != id1 && key != id2 && DistancePoint2Line(zone.getCenter(), zones.at(id1).getCenter(), zones.at(id2).getCenter()) < zone.getRadius()) {
+            std::cout <<"ERROR - Link between zones " << id1 <<" and "<< id2
+                      <<" passes through zone "<< key <<".\n";
             return false;
         }
     }
     return true;
+}
+
+bool Archipelago::LinkAllowed(uint id1, uint id2) {
+    return zones.at(id1).LinkAllowed(id2) and zones.at(id2).LinkAllowed(id1);
+}
+
+void Archipelago::ConnectZones(Zone& z1, Zone& z2) {
+    z1.AddLink(z2.id);
+    z2.AddLink(z1.id);
+    links.push_back(std::make_pair(z1.id, z2.id)); // check for existence
+    nb_links += 1;
+}
+
+void Archipelago::DisconnectZones(Zone& z1, Zone& z2) {
+    z1.RemoveLink(z2.id);
+    z2.RemoveLink(z1.id);
+    links.erase(find(links.begin(), links.end(), std::make_pair(z1.id, z2.id)));
+    nb_links -= 1;
+}
+
+
+
+
+
+#define BLACK {  0,  0,  0}
+#define RED   {255,  0,  0}
+#define GREEN {  0,255,  0}
+#define BLUE  {  0,  0,255}
+// #define GREEN {165, 42, 42}
+// #define notGREEN {0, 102, 51}
+#define WHITE {255,255,255}
+
+#include <gdkmm/screen.h>
+
+// static Glib::RefPtr<Gdk::Screen> screen = Gdk::Screen::get_default();
+// int screenwidth = screen->get_width();
+// int screenheight = screen->get_height();
+
+#define SIGN(x) (x < 0 ? (-1) : (1))
+void Archipelago::zoomfn(double change) {
+    static double last = 1;
+    //somehow works, some conditions are to verify
+    if(last - change > 0.1 and 0.91 < change && change < 1.10) { // ignore first 10%
+        last = 1;
+        return ;
+    }
+    zoom = CLAMP(zoom*(1+0.02*SIGN(change-last)), 0.1326, 7.2446); // /100&x100 zoom
+    last = change;
+    std::cout<<change<<' '<<zoom<<'\n';
+    // CLAMP(zoom, -10,10);
+    queue_draw();
 }
 
 
 
 
 bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
+
+    Gtk::Allocation allocation = get_allocation();
+    const int width = allocation.get_width();
+    const int height = allocation.get_height();
+
+    FillRectangle(pencil, WHITE, {0, 0}, width, height);
+    DrawRectangle(pencil, BLACK, {0, 0}, width, height);
+
+    Cairo::Matrix matrix = Cairo::identity_matrix();
+    matrix.translate(width/2 + xoffset, height/2 + yoffset);
+
+    scale = CLAMP(zoom*MIN(width, height)/1000*2, 0.3, 3);
+    matrix.scale(scale, scale);
+
+    pencil->set_matrix(matrix);
+
+    Coord2D center{width/2 + xoffset, height/2 + yoffset};
     if(zones.empty()) return 1;
-    for(auto& zone : zones) {
-        Coord tmp{100,100},c{zone->getCenter()+tmp}; double r{zone->getRadius()};
-        switch(zone->type) {
-          case ResidentialArea: std::cout<<"R\n";
-            DrawCircle(pencil, c, r);
+    for(auto& link : links) {
+        Coord2D c1{zones.at(link.first).getCenter().x, -zones.at(link.first).getCenter().y}; c1 = c1*scale + center;
+        Coord2D c2{zones.at(link.second).getCenter().x, -zones.at(link.second).getCenter().y}; c2 = c2*scale + center;
+        DrawLine(pencil, BLACK, c1, c2);
+    }
+    for(auto& [key, zone] : zones) {
+        Coord2D c{zone.getCenter().x, -zone.getCenter().y}; c = c*scale + center; double r{zone.getRadius()*scale};
+        switch(zone.type) {
+          case ResidentialArea:
+            FillCircle(pencil, WHITE, c, r);
+            FillCircle(pencil, {0,0,255,0.5}, c, r);
+            DrawCircle(pencil, BLUE, c, r);
             break;
-          case TransportHub: std::cout<<"T\n";
-            DrawLine(pencil, {c.x + r, c.y}, {c.x - r, c.y});
-            DrawLine(pencil, {c.x + M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x - M_SQRT1_2*r, c.y - M_SQRT1_2*r});
-            DrawLine(pencil, {c.x, c.y + r}, {c.x, c.y - r});
-            DrawLine(pencil, {c.x - M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x + M_SQRT1_2*r, c.y - M_SQRT1_2*r});
-            DrawCircle(pencil, c, r);
+          case TransportHub:
+            FillCircle(pencil, WHITE, c, r);
+            FillCircle(pencil, {0,255,0,0.2}, c, r);
+            DrawLine(pencil, GREEN, {c.x + r, c.y}, {c.x - r, c.y});
+            DrawLine(pencil, GREEN, {c.x + M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x - M_SQRT1_2*r, c.y - M_SQRT1_2*r});
+            DrawLine(pencil, GREEN, {c.x, c.y + r}, {c.x, c.y - r});
+            DrawLine(pencil, GREEN, {c.x - M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x + M_SQRT1_2*r, c.y - M_SQRT1_2*r});
+            DrawCircle(pencil, GREEN, c, r);
             break;
-          case ProductionZone:std::cout<<"P\n";
-            DrawCircle(pencil, c, r);
-            pencil->set_source_rgb(1, 0.0, 0.0);    // partially translucent
-            pencil->fill_preserve();
-            DrawRectangle(pencil, {c.x - 0.7*r, c.y - 0.12*r}, 1.4*r, 0.24*r); // change sign after ok cordintes
-            pencil->set_source_rgb(1, 1, 1);    // partially translucent
-            pencil->fill();
+          case ProductionZone:
+            FillCircle(pencil, RED, c, r);
+            DrawCircle(pencil, BLACK, c, r);
+            FillRectangle(pencil, WHITE, {c.x - 0.7*r, c.y - 0.12*r}, 1.4*r, 0.24*r); // change sign after ok cordintes
             break;
           default:;
             // no other
         }
     }
+
     return 1;
 }
 
@@ -185,4 +308,16 @@ bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
 void Archipelago::Reset(void) {
     zones.clear();
     links.clear();
+    nb_zones[0] = 0;
+    nb_zones[1] = 0;
+    nb_zones[2] = 0;
+    nb_links = 0;
+    ResetView();
+}
+
+void Archipelago::ResetView(void) {
+    zoom = 1;
+    scale = 1;
+    xoffset = 0;
+    yoffset = 0;
 }
