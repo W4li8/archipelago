@@ -27,8 +27,10 @@ class Zone {
     const uint id;       // unique identifier
     const ZoneType type; // zone classifier
 
-    Coord2D getCenter(void) { return position; }
-	  double  getRadius(void) { return sqrt(nb_people); }
+	  double  getRadius(void) const { return sqrt(nb_people); }
+    Coord2D getCenter(void) const { return position; }
+    void setRadius(double nb) { nb_people = nb*nb; }
+    void setCenter(Coord2D pos) { position = pos; }
 	// uint   getNbLinks(void) const { return links.size(); }
   bool LinkAllowed(uint id) { return links.size() < max_links and find(links.begin(), links.end(), id) == links.end(); }
   void AddLink(uint id) {links.push_back(id);}
@@ -45,7 +47,7 @@ class Zone {
   bool operator==(const ZoneType& x) const { return x == type; }
   bool operator!=(const ZoneType& x) const { return x != type; }
   Coord2D operator+(const Coord2D& v) const  { return {position.x + v.x, position.y + v.y}; }
-  Coord2D operator-(const Vector2D& v) const { return {position.x - v.x, position.y - v.y}; }
+  Coord2D operator-(const Coord2D& v) const { return {position.x - v.x, position.y - v.y}; }
   double operator*(const double& x) const { return sqrt(sqrt(nb_people)*x); }
   double operator/(const double& x) const { return sqrt(sqrt(nb_people)/x); }
 

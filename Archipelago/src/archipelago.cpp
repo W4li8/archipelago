@@ -6,65 +6,27 @@
 #include <fstream>
 #include <vector>
 #include "archipelago.hpp"
+#include "graphics.hpp"
 
 using uint = unsigned int;
 
-struct Color {
-    Color(int red, int green, int blue, double alpha = 1.0)
-    : red{double(red)/255}, green{double(green)/255}, blue{double(blue)/255}, alpha{alpha} {}
-
-    double red, green, blue, alpha;
-};
-void DrawLine(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D A, Coord2D B) {
-	cr->save();
-    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
-	cr->move_to(A.x, A.y);
-    cr->line_to(B.x, B.y);
-	cr->stroke();
-    cr->restore();
-}
-
-void DrawCircle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D center, double radius) {
-    cr->save();
-    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
-	cr->arc(center.x, center.y, radius, 0.0, 2*M_PI);
-    cr->stroke();
-    cr->restore();
-}
-void FillCircle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D center, double radius) {
-    cr->save();
-    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
-	cr->arc(center.x, center.y, radius, 0.0, 2*M_PI);
-    cr->fill();
-    cr->restore();
-}
-void DrawRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D cornerTL, double width, double height) {
-	cr->save();
-    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
-    cr->rectangle(cornerTL.x, cornerTL.y, width, height);
-    cr->stroke();
-    cr->restore();
-}
-void FillRectangle(const Cairo::RefPtr<Cairo::Context>& cr, Color rgba, Coord2D cornerTL, double width, double height) {
-	cr->save();
-    cr->set_source_rgba(rgba.red, rgba.green, rgba.blue, rgba.alpha);
-    cr->rectangle(cornerTL.x, cornerTL.y, width, height);
-    cr->fill_preserve();
-    cr->restore();
-}
-
-
 Archipelago::Archipelago(void) {
-    zoom = 1;
+    m_zoom = 1;
     scale = 1;
+    view = Cairo::identity_matrix();
     xoffset = 0; yoffset = 0;
+    selected_zone = 0;
+    // pop_menu.append(move);
+    // pop_menu.append(resize);
+    // pop_menu.append(connect);
+    // pop_menu.append(remove);
+    // pop_menu.show_all();
+    // 	pop_menu.accelerate(*this);
+
+
     add_events(Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK | Gdk::POINTER_MOTION_MASK | Gdk::SCROLL_MASK  | Gdk::SMOOTH_SCROLL_MASK);
-
-      m_GestureZoom = Gtk::GestureZoom::create(*this);
-  m_GestureZoom->set_propagation_phase(Gtk::PHASE_CAPTURE);
-  m_GestureZoom->signal_scale_changed().connect(sigc::mem_fun(*this, &Archipelago::zoomfn));
+    OpenFile("debug/success/S01.txt");
 }
-
 
 template<class... T>
 bool ParseLineFromFile(std::ifstream& file, T&... args) {
@@ -97,10 +59,9 @@ void Archipelago::OpenFile(std::string filename) {
             uint id, nb_people;
             double x, y;
             while(!file.eof() && zones2read) {
-                if(ParseLineFromFile(file, id, x, y, nb_people)) {  // and far from all zones
+                if(ParseLineFromFile(file, id, x, y, nb_people)) {
                     if(SpacePermitsZone({x, y}, sqrt(nb_people))) {
                         CreateZone({id, ZoneType(idtype), {x, y}, nb_people});
-                        // std::cout<<"create zone "<<id<<'\n';
                     }
                     zones2read -= 1;
                 }
@@ -116,9 +77,8 @@ void Archipelago::OpenFile(std::string filename) {
                 if(ParseLineFromFile(file, id1, id2)) {
                     if(LinkAllowed(id1, id2) and SpacePermitsLink(id1, id2)) {
                         ConnectZones(zones.at(id1), zones.at(id2));
-                        // std::cout<<"link zones "<<id1<<' '<<id2<<'\n';
                     }
-                    links2read -= 1; // will ignore entry if an id is incorrect
+                    links2read -= 1;
                 }
             }
             idtype += 1;
@@ -136,18 +96,24 @@ void Archipelago::SaveFile(std::string filename) {
     time_t clock = time(0);
     file <<"# "<< ctime(&clock);
 
-    int idtype{-1};
-    for(auto& [key, zone] : zones) {
-        if(zone.type != ZoneType(idtype) && idtype < ZoneType::NbZoneTypes) {
-            switch(++idtype) {
-              case ProductionZone:  file <<"\n# Production Zones\n"; break;
-              case ResidentialArea: file <<"\n# Residential Areas\n"; break;
-              case TransportHub:    file <<"\n# Transport Hubs\n"; break;
-              default:;
-            }
-            file << nb_zones[idtype] <<'\n';
+    int idtype{-1}, count{0};
+    while(idtype < ZoneType::NbZoneTypes) {
+        switch(++idtype) {
+            case ProductionZone:  file <<"\n# Production Zones\n"; break;
+            case ResidentialArea: file <<"\n# Residential Areas\n"; break;
+            case TransportHub:    file <<"\n# Transport Hubs\n"; break;
+            default:;
         }
-        file <<'\t'<< zone <<'\n';
+        file << nb_zones[idtype] <<'\n';
+        for(auto& [key, zone] : zones) {
+            if(zone.type == idtype) {
+                file <<'\t'<< zone <<'\n';
+                if(++count == nb_zones[idtype]) { //avoid looping when done
+                    break;
+                }
+            }
+        }
+        count = 0;
     }
     file <<"\n# Links\n" << nb_links <<'\n';
     for(auto& link : links) {
@@ -156,40 +122,54 @@ void Archipelago::SaveFile(std::string filename) {
     file.close();
 }
 // put msg in calling fn
-bool Archipelago::SpacePermitsZone(Coord2D center, double radius) {
+bool Archipelago::SpacePermitsZone(Coord2D center, double radius, uint id) const {
 
     for(auto& [key, zone] : zones) {
-        if(DistancePoint2Point(zone.getCenter(), center) < (zone.getRadius() + radius)) {
-            std::cout <<"ERROR - Zones "<< key <<" and "<< center.x<<' '<<center.y <<" overlap."<<DistancePoint2Point(zone.getCenter(), center)<<"\n";
+        if(key != id && DistancePoint2Point(zone.getCenter(), center) < (zone.getRadius() + radius)) {
+            std::cout <<"ERROR - Zones "<< key <<" and "<< center.x<<' '<<center.y <<" id "<<id<<" overlap.\n";
+            return false;
+        }
+    }
+    for(auto& [id1, id2] : links) {
+        if(not SpacePermitsLink(id1, id2)) {
             return false;
         }
     }
     return true;
 }
 
+bool Archipelago::SpacePermitsZone(const Zone& z0) const {
+    Coord2D c{z0.getCenter()};
+    double  r{z0.getRadius()};
+    return SpacePermitsZone(c, r, z0.id);
+}
+
 void Archipelago::CreateZone(const Zone& z0) {
     zones.emplace(z0.id, z0);
     nb_zones[z0.type] += 1;
+    queue_draw();
 }
 
 void Archipelago::DestroyZone(Zone& z0) {
 
-    for(auto& [key, zone] : zones) {
-        zone.RemoveLink(z0.id);
+    for(auto [id1, id2]: links) {
+        if(id1 == z0.id or id2 == z0.id) {
+            DisconnectZones(zones.at(id1), zones.at(id2));
+        }
     }
     nb_zones[z0.type] -= 1;
     zones.erase(z0.id);
-
+    queue_draw();
 }
 
 
 // put msg in calling fn
-bool Archipelago::SpacePermitsLink(uint id1, uint id2) {
+bool Archipelago::SpacePermitsLink(uint id1, uint id2) const {
 
     for(auto& [key, zone] : zones) {
-        if(key != id1 && key != id2 && DistancePoint2Line(zone.getCenter(), zones.at(id1).getCenter(), zones.at(id2).getCenter()) < zone.getRadius()) {
-            std::cout <<"ERROR - Link between zones " << id1 <<" and "<< id2
-                      <<" passes through zone "<< key <<".\n";
+        if(key != id1 && key != id2 && DistancePoint2Segment(zone.getCenter(), zones.at(id1).getCenter(), zones.at(id2).getCenter()) < zone.getRadius()) {
+            std::cerr <<"ERROR - Link between zones "<< id1 <<"("<<zones.at(id1).getCenter().x<<','<<zones.at(id1).getCenter().y<<")"<<" and "<< id2<<"("<<zones.at(id2).getCenter().x<<','<<zones.at(id2).getCenter().y<<")"
+                      <<" passes through zone "<< key<<"("<<zone.getCenter().x<<','<<zone.getCenter().y<<") dist: " <<DistancePoint2Line(zone.getCenter(), zones.at(id1).getCenter(), zones.at(id2).getCenter())<<" vs "<<zone.getRadius()<<".\n";
             return false;
         }
     }
@@ -203,8 +183,9 @@ bool Archipelago::LinkAllowed(uint id1, uint id2) {
 void Archipelago::ConnectZones(Zone& z1, Zone& z2) {
     z1.AddLink(z2.id);
     z2.AddLink(z1.id);
-    links.push_back(std::make_pair(z1.id, z2.id)); // check for existence
+    links.push_back({z1.id, z2.id}); // check for existence
     nb_links += 1;
+    queue_draw();
 }
 
 void Archipelago::DisconnectZones(Zone& z1, Zone& z2) {
@@ -212,95 +193,124 @@ void Archipelago::DisconnectZones(Zone& z1, Zone& z2) {
     z2.RemoveLink(z1.id);
     links.erase(find(links.begin(), links.end(), std::make_pair(z1.id, z2.id)));
     nb_links -= 1;
-}
-
-
-
-
-
-#define BLACK {  0,  0,  0}
-#define RED   {255,  0,  0}
-#define GREEN {  0,255,  0}
-#define BLUE  {  0,  0,255}
-// #define GREEN {165, 42, 42}
-// #define notGREEN {0, 102, 51}
-#define WHITE {255,255,255}
-
-#include <gdkmm/screen.h>
-
-// static Glib::RefPtr<Gdk::Screen> screen = Gdk::Screen::get_default();
-// int screenwidth = screen->get_width();
-// int screenheight = screen->get_height();
-
-#define SIGN(x) (x < 0 ? (-1) : (1))
-void Archipelago::zoomfn(double change) {
-    static double last = 1;
-    //somehow works, some conditions are to verify
-    if(last - change > 0.1 and 0.91 < change && change < 1.10) { // ignore first 10%
-        last = 1;
-        return ;
-    }
-    zoom = CLAMP(zoom*(1+0.02*SIGN(change-last)), 0.1326, 7.2446); // /100&x100 zoom
-    last = change;
-    std::cout<<change<<' '<<zoom<<'\n';
-    // CLAMP(zoom, -10,10);
     queue_draw();
 }
 
 
 
 
+
+// #define black Color(  0,  0,  0)
+#define RED   Color(255,  0,  0)
+#define GREEN Color(  0,255,  0)
+#define BLUE  Color(  0,  0,255)
+// #define GREEN {165, 42, 42}
+// #define notGREEN {0, 102, 51}
+// #define white {255,255,255}
+
+
+void Archipelago::Zoom(double sign) {
+    m_zoom = CLAMP(m_zoom*(1+sign*0.02), 0.1326, 7.2446);
+    queue_draw();
+}
+
+
+void Archipelago::DragStart(Coord2D pos) {
+
+    for(auto& [key, zone] : zones) {
+        if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
+            selected_zone = key;
+            drag_select_offset = pos - zone.getCenter();
+            origin = zone.getCenter();
+            nb = zone.getRadius();
+            break;
+        }
+    }
+}
+
+void Archipelago::DragUpdate(Coord2D pos) {
+    if(moveFlag)
+    if(selected_zone) {
+        zones.at(selected_zone).setCenter(pos - drag_select_offset);
+        queue_draw();
+    }
+    if(resizeFlag)
+    if(selected_zone) {
+        zones.at(selected_zone).setRadius(CLAMP(DistancePoint2Point(origin, pos), 10, 300));
+        queue_draw();
+    }
+}
+
+void Archipelago::DragEnd(Coord2D pos) {
+    if(selected_zone && (moveFlag or resizeFlag))
+    if(not SpacePermitsZone(zones.at(selected_zone))) {
+        zones.at(selected_zone).setCenter(origin);
+        zones.at(selected_zone).setRadius(nb);
+        queue_draw();
+    }
+    if(selected_zone && connectFlag)
+    for(auto& [key, zone] : zones) {
+        if(key != selected_zone && DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
+            if(LinkAllowed(selected_zone, key) and SpacePermitsLink(selected_zone, key)) {
+                ConnectZones(zones.at(selected_zone), zone);
+                std::cout<<"connected: "<<selected_zone<<" and "<<key<<'\n';
+            }
+            break;
+        }
+    }
+    ResetFlags();
+    selected_zone = 0;
+}
+
+void Archipelago::Swipe(double dx, double dy) {
+    xoffset -= dx;
+    yoffset -= dy;
+    queue_draw();
+}
 bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
 
-    Gtk::Allocation allocation = get_allocation();
-    const int width = allocation.get_width();
-    const int height = allocation.get_height();
+    UpdateCoordinates();
+    Draw(pencil, {{0, 0}, {width, 0}, {width, height}, {0, height}}, {black, 0.6});
+    // DrawRectangle(pencil, black, {0, 0}, width, height);
 
-    FillRectangle(pencil, WHITE, {0, 0}, width, height);
-    DrawRectangle(pencil, BLACK, {0, 0}, width, height);
-
-    Cairo::Matrix matrix = Cairo::identity_matrix();
-    matrix.translate(width/2 + xoffset, height/2 + yoffset);
-
-    scale = CLAMP(zoom*MIN(width, height)/1000*2, 0.3, 3);
-    matrix.scale(scale, scale);
-
-    pencil->set_matrix(matrix);
-
-    Coord2D center{width/2 + xoffset, height/2 + yoffset};
     if(zones.empty()) return 1;
     for(auto& link : links) {
         Coord2D c1{zones.at(link.first).getCenter().x, -zones.at(link.first).getCenter().y}; c1 = c1*scale + center;
         Coord2D c2{zones.at(link.second).getCenter().x, -zones.at(link.second).getCenter().y}; c2 = c2*scale + center;
-        DrawLine(pencil, BLACK, c1, c2);
+        Draw(pencil, {c1, c2}, black);
     }
     for(auto& [key, zone] : zones) {
         Coord2D c{zone.getCenter().x, -zone.getCenter().y}; c = c*scale + center; double r{zone.getRadius()*scale};
         switch(zone.type) {
           case ResidentialArea:
-            FillCircle(pencil, WHITE, c, r);
-            FillCircle(pencil, {0,0,255,0.5}, c, r);
-            DrawCircle(pencil, BLUE, c, r);
+            Draw(pencil, {c, r});
+            Draw(pencil, c);
+            Draw(pencil, {c, r}, white);
+            Draw(pencil, {c, r}, blue, {0,0,255,0.5});
+            Draw(pencil, {{c.x, c.y-0.75*r}, {c.x-0.5*sqrt(3)*0.75*r, c.y+0.5*0.75*r}, {c.x+0.5*sqrt(3)*0.75*r, c.y+0.5*0.75*r}}, white);
+            Draw(pencil, {{c.x, c.y+0.75*r}, {c.x-0.5*sqrt(3)*0.75*r, c.y-0.5*0.75*r}, {c.x+0.5*sqrt(3)*0.75*r, c.y-0.5*0.75*r}}, white);
+            Draw(pencil, {{c.x, c.y-0.60*r}, {c.x-0.5*sqrt(3)*0.60*r, c.y+0.5*0.60*r}, {c.x+0.5*sqrt(3)*0.60*r, c.y+0.5*0.60*r}}, {142, 48, 136}, {142, 48, 136});
+            Draw(pencil, {{c.x, c.y+0.60*r}, {c.x-0.5*sqrt(3)*0.60*r, c.y-0.5*0.60*r}, {c.x+0.5*sqrt(3)*0.60*r, c.y-0.5*0.60*r}}, {142, 48, 136}, {142, 48, 136});
             break;
           case TransportHub:
-            FillCircle(pencil, WHITE, c, r);
-            FillCircle(pencil, {0,255,0,0.2}, c, r);
-            DrawLine(pencil, GREEN, {c.x + r, c.y}, {c.x - r, c.y});
-            DrawLine(pencil, GREEN, {c.x + M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x - M_SQRT1_2*r, c.y - M_SQRT1_2*r});
-            DrawLine(pencil, GREEN, {c.x, c.y + r}, {c.x, c.y - r});
-            DrawLine(pencil, GREEN, {c.x - M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x + M_SQRT1_2*r, c.y - M_SQRT1_2*r});
-            DrawCircle(pencil, GREEN, c, r);
+            Draw(pencil, {c, r}, white);
+            pencil->set_line_width(4);
+            Draw(pencil, {c, r}, green, {0,255,0,0.2});
+            pencil->set_line_width(1);
+            Draw(pencil, {{c.x + r, c.y}, {c.x - r, c.y}}, green);
+            Draw(pencil, {{c.x + M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x - M_SQRT1_2*r, c.y - M_SQRT1_2*r}}, green);
+            Draw(pencil, {{c.x, c.y + r}, {c.x, c.y - r}}, GREEN);
+            Draw(pencil, {{c.x - M_SQRT1_2*r, c.y + M_SQRT1_2*r}, {c.x + M_SQRT1_2*r, c.y - M_SQRT1_2*r}}, green);
             break;
           case ProductionZone:
-            FillCircle(pencil, RED, c, r);
-            DrawCircle(pencil, BLACK, c, r);
-            FillRectangle(pencil, WHITE, {c.x - 0.7*r, c.y - 0.12*r}, 1.4*r, 0.24*r); // change sign after ok cordintes
+            Draw(pencil, {c, r}, black, red);
+            Draw(pencil, Quadrilateral2D({c.x - 0.7*r, c.y - 0.12*r}, {c.x + 0.7*r, c.y - 0.12*r},
+                                         {c.x + 0.7*r, c.y + 0.12*r}, {c.x - 0.7*r, c.y + 0.12*r}), white); // change sign after ok cordintes
+            Draw(pencil, {{Coord2D(-40,-70)+c,Coord2D(80,-30)+c,Coord2D(0,0)+c,Coord2D(20,70)+c,Coord2D(-90,0)+c}});
             break;
           default:;
-            // no other
         }
     }
-
     return 1;
 }
 
@@ -316,8 +326,56 @@ void Archipelago::Reset(void) {
 }
 
 void Archipelago::ResetView(void) {
-    zoom = 1;
+    m_zoom = 1;
     scale = 1;
     xoffset = 0;
     yoffset = 0;
+}
+
+
+void Archipelago::on_button_press_event2(int button, Coord2D pos) {
+    UpdateCoordinates();
+
+    if(removeFlag && button == 1) {
+        for(auto& [key, zone] : zones) {
+            if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
+                DestroyZone(zone);
+                return;
+            }
+        }
+        for(auto& [id1, id2] : links) {
+            if(DistancePoint2Line(pos, zones.at(id1).getCenter(), zones.at(id2).getCenter()) < 5) {
+                DisconnectZones(zones.at(id1), zones.at(id2));
+                return;
+            }
+        }
+    }
+    if(removeFlag && button == 3) {
+        removeFlag = 0;
+    }
+}
+
+void Archipelago::on_button_release_event2(int button, Coord2D pos) {
+    UpdateCoordinates();
+
+
+    if(button == 3) {
+
+    }
+}
+
+
+void Archipelago::UpdateCoordinates(void) {
+    Gtk::Allocation allocation = get_allocation();
+    width = allocation.get_width();
+    height = allocation.get_height();
+
+    center = {width/2 + xoffset, height/2 - yoffset};
+    scale = CLAMP(m_zoom*MIN(width, height)/500, 0.3, 3);
+}
+
+Coord2D Archipelago::MouseXY_to_ArchipelagoXY(Coord2D mouse) {
+    UpdateCoordinates();
+    Coord2D pos{mouse.x - center.x, center.y - mouse.y};
+    return pos/scale;
 }
