@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
-#include "archipelago.hpp"
+#include "archipelago-bg.hpp"
 #include "graphics.hpp"
 
 using uint = unsigned int;
@@ -270,8 +270,13 @@ void Archipelago::Swipe(double dx, double dy) {
 bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
 
     UpdateCoordinates();
-    Draw(pencil, {{0, 0}, {width, 0}, {width, height}, {0, height}}, {black, 0.6});
+    Draw(pencil, {{0, 0}, {width, 0}, {width, height}, {0, height}}, {black, 0.6}, red);
+    Coord2D c{width/2, height/2};
+    Draw(pencil, {c+Coord2D(-20, 60),c+Coord2D(-20, -60),c+Coord2D(20, -60),c+Coord2D(20, 60)}, white);
+    Draw(pencil, {c+Coord2D(60,20),c+Coord2D(60,-20),c+Coord2D(-60,-20),c+Coord2D(-60,20)}, white);
     // DrawRectangle(pencil, black, {0, 0}, width, height);
+    pencil->set_source_rgb(white.red, white.green,white.blue);
+      pencil->paint();
 
     if(zones.empty()) return 1;
     for(auto& link : links) {
@@ -284,13 +289,13 @@ bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
         switch(zone.type) {
           case ResidentialArea:
             Draw(pencil, {c, r});
-            Draw(pencil, c);
             Draw(pencil, {c, r}, white);
             Draw(pencil, {c, r}, blue, {0,0,255,0.5});
             Draw(pencil, {{c.x, c.y-0.75*r}, {c.x-0.5*sqrt(3)*0.75*r, c.y+0.5*0.75*r}, {c.x+0.5*sqrt(3)*0.75*r, c.y+0.5*0.75*r}}, white);
             Draw(pencil, {{c.x, c.y+0.75*r}, {c.x-0.5*sqrt(3)*0.75*r, c.y-0.5*0.75*r}, {c.x+0.5*sqrt(3)*0.75*r, c.y-0.5*0.75*r}}, white);
             Draw(pencil, {{c.x, c.y-0.60*r}, {c.x-0.5*sqrt(3)*0.60*r, c.y+0.5*0.60*r}, {c.x+0.5*sqrt(3)*0.60*r, c.y+0.5*0.60*r}}, {142, 48, 136}, {142, 48, 136});
             Draw(pencil, {{c.x, c.y+0.60*r}, {c.x-0.5*sqrt(3)*0.60*r, c.y-0.5*0.60*r}, {c.x+0.5*sqrt(3)*0.60*r, c.y-0.5*0.60*r}}, {142, 48, 136}, {142, 48, 136});
+            Draw(pencil, Point2D(c.x, c.y));
             break;
           case TransportHub:
             Draw(pencil, {c, r}, white);
@@ -306,7 +311,7 @@ bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) {
             Draw(pencil, {c, r}, black, red);
             Draw(pencil, Quadrilateral2D({c.x - 0.7*r, c.y - 0.12*r}, {c.x + 0.7*r, c.y - 0.12*r},
                                          {c.x + 0.7*r, c.y + 0.12*r}, {c.x - 0.7*r, c.y + 0.12*r}), white); // change sign after ok cordintes
-            Draw(pencil, {{Coord2D(-40,-70)+c,Coord2D(80,-30)+c,Coord2D(0,0)+c,Coord2D(20,70)+c,Coord2D(-90,0)+c}});
+            // Draw(pencil, {{Coord2D(-40,-70)+c,Coord2D(80,-30)+c,Coord2D(0,0)+c,Coord2D(20,70)+c,Coord2D(-90,0)+c}});
             break;
           default:;
         }

@@ -1,23 +1,18 @@
 #include "graphics.hpp"
 
-void Draw(Pencil& cr, const Point2D& P, Color line, Color fill) {
-    // cr->save();
-    // cr->move_to(P.x, P.y);
-    // cr->line_to(P.x, P.y);
-    // cr->set_source_rgba(fill.red, fill.green, fill.blue, fill.alpha);
-    // cr->fill_preserve();
-    // cr->set_source_rgba(line.red, line.green, line.blue, line.alpha); // useless to fill?
-    // cr->stroke();
-    // cr->restore();
-    Draw(cr, {P, 1.0}, line, line);
+void Draw(Pencil& cr, const Point2D& P, Color dot) {
+    cr->save();
+	cr->arc(P.x, P.y, 1, 0.0, 2*M_PI);
+    cr->set_source_rgba(dot.red, dot.green, dot.blue, dot.alpha);
+    cr->fill();
+    cr->restore();
+    // Draw(cr, {P, 1.0}, line, line);
 }
-void Draw(Pencil& cr, const Segment2D& S, Color line, Color fill) {
+void Draw(Pencil& cr, const Segment2D& S, Color line) {
 	cr->save();
 	cr->move_to(S.A.x, S.A.y);
     cr->line_to(S.B.x, S.B.y);
-    cr->set_source_rgba(fill.red, fill.green, fill.blue, fill.alpha);
-    cr->fill_preserve();
-    cr->set_source_rgba(line.red, line.green, line.blue, line.alpha); // useless to fill?
+    cr->set_source_rgba(line.red, line.green, line.blue, line.alpha);
     cr->stroke();
     cr->restore();
 }
