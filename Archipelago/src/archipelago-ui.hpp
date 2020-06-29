@@ -8,8 +8,9 @@
 #include <gtkmm/menu.h>
 #include <gtkmm/menuitem.h>
 
-#include <gtkmm/gesturezoom.h>
 #include <gtkmm/gestureswipe.h>
+#include <gtkmm/gesturerotate.h>
+#include <gtkmm/gesturezoom.h>
 #include <gtkmm/gesturedrag.h>
 // #include <gtkmm/box.h>
 #include "archipelago-bg.hpp"
@@ -72,18 +73,25 @@ class ArchipelagoUI : public Gtk::Window {
   private: // Archipelago
     Archipelago model;
 	Glib::RefPtr<Gtk::GestureSwipe> m_GestureSwipe;
-  	Glib::RefPtr<Gtk::GestureZoom> m_GestureZoom;
-  	Glib::RefPtr<Gtk::GestureDrag> m_GestureDrag;
+	Glib::RefPtr<Gtk::GestureRotate> m_GestureRotate;
+  	Glib::RefPtr<Gtk::GestureZoom>  m_GestureZoom;
+  	// Glib::RefPtr<Gtk::GesturePan>  m_GesturePan;
+  	Glib::RefPtr<Gtk::GestureDrag>  m_GestureDrag;
 	void Zoom_cb(double change);
 	void Swipe_cb(double vx, double vy);
+	void Rotate_cb(double vx, double vy);
 	// void Pan_cb(double vx, double vy);
-	void Drag_cb(double dx, double dy);
 	void DragStart_cb(double dx, double dy);
+	void Drag_cb(double dx, double dy);
 	void DragEnd_cb(double dx, double dy);
+    bool on_motion_notify_event(GdkEventMotion*event) override;
+    bool on_key_release_event(GdkEventKey* event) override;
+    void RefreshMouseCoordinates(void);
+
 
   private: // UI console
-    Gtk::Label  messages;
-    Gtk::Label  spacer;
+    Gtk::Label messages;
+    Gtk::Label spacer;
 
 
 	void OpenFile_cb(void);

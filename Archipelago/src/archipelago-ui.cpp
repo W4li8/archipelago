@@ -6,20 +6,24 @@ void setMargin(Gtk::Widget& widget, uint right, uint top, uint left, uint bottom
 	widget.set_margin_left(left);
 	widget.set_margin_bottom(bottom);
 }
+
+
 std::string StripPathFromFileName(std::string filename) {
-	for(auto it = find(filename.begin(), filename.end(), '/');
-		it < filename.end(); it = find(filename.begin(), filename.end(), '/')) {
+	for(auto it = find(filename.begin(), filename.end(), '/'); it < filename.end();
+        it = find(filename.begin(), filename.end(), '/')) {
 		filename.erase(filename.begin(), it+1); // strip directory
 	}
     filename.erase(find(filename.begin(), filename.end(), '.'), filename.end()); // strip extension
 	return filename;
 }
 
-
-
 void ArchipelagoUI::OpenFile_cb(void) {
-	model.OpenFile(getFilename());
-	setWindowTitle("Archipelago - " + StripPathFromFileName(getFilename()));
+	if(model.OpenFile(getFilename())) {
+	    setWindowTitle("Archipelago - " + StripPathFromFileName(getFilename()));
+    } else {
+        setWindowTitle("Archipelago");
+        messages.set_label("Could not open file "+ getFilename());
+    }
 }
 void ArchipelagoUI::SaveFile_cb(void) {
 	model.SaveFile(getFilename());
@@ -39,6 +43,7 @@ void ArchipelagoUI::addmenu(char zone) {
 		case 'p': model.CreateZone({bs++, ZoneType::ProductionZone, model.MouseXY_to_ArchipelagoXY({mx, my}), 100});
 		break;
 	}
+
 	model.resizemenu();
 }
 
@@ -69,18 +74,45 @@ void append(Gtk::Menu& menu, Args&&...args) {
    (menu.append(args), ...);
 	menu.show_all();
 }
-bool ArchipelagoUI::on_timeout(void) {
-	static int i{10};
-	if(i) {
-		std::cout << i-- <<"s\n";
-		return 1;
-	} else {
-		std::cout <<"BOOM\n";
-		Gtk::Window::close();
-		return 0;
-	}
+// bool ArchipelagoUI::on_timeout(void) {
+//     // model.deg +=10;
+//     // model.queue_draw();
+//     return 1;
+// 	static int i{10};
+// 	if(i) {
+// 		std::cout << i-- <<"s\n";
+// 		return 1;
+// 	} else {
+// 		std::cout <<"BOOM\n";
+// 		Gtk::Window::close();
+// 		return 0;
+// 	}
 
+// }
+bool ArchipelagoUI::on_key_release_event(GdkEventKey* event) {
+    switch(gdk_keyval_to_upper(event->keyval)) {
+      case GDK_KEY_P: addmenu('p');
+        break;
+      case GDK_KEY_R: addmenu('r');
+        break;
+      case GDK_KEY_T: addmenu('t');
+        break;
+      case GDK_KEY_C: connectmenu();
+        break;
+      case GDK_KEY_O: if(event->state & GDK_CONTROL_MASK) OpenFile_cb();
+        break;
+      case GDK_KEY_S: if(event->state & GDK_CONTROL_MASK) SaveFile_cb();
+        break;
+      case GDK_KEY_BackSpace: removemenu();
+        break;
+      case GDK_KEY_K: if(event->state & GDK_MOD2_MASK) std::cout<<"COMMAND\n";
+        break;
+      default:
+        messages.set_text("this key does nothing");
+    }
+    return 1;
 }
+
 
 ArchipelagoUI::ArchipelagoUI() {
 
@@ -88,8 +120,9 @@ ArchipelagoUI::ArchipelagoUI() {
     setWindowTitle("Archipelago");
     setWindowSize(400,400);
 		// open.set_image_from_icon_name("document-open", Gtk::ICON_SIZE_BUTTON);
-	Glib::signal_timeout().connect(sigc::mem_fun(*this, &ArchipelagoUI::on_timeout), 2000 );
-
+	Glib::signal_timeout().connect(sigc::mem_fun(*this, &ArchipelagoUI::on_timeout), 50 );
+    model.add_events(Gdk::POINTER_MOTION_MASK | Gdk::KEY_RELEASE_MASK);
+    // model.signal_key_press_event().connect(sigc::mem_fun(*this, &MyWindow::onKeyPress), false);
 
 	// expand(controls, 1, 0);
 	// expand(ctrl, 1, 0);
@@ -165,9 +198,11 @@ ArchipelagoUI::ArchipelagoUI() {
 	Gtk::Window::show_all();
 
 	m_GestureZoom = Gtk::GestureZoom::create(model);
+	m_GestureRotate = Gtk::GestureRotate::create(model);
 	m_GestureDrag = Gtk::GestureDrag::create(model);
 
 	m_GestureZoom->signal_scale_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Zoom_cb));
+	m_GestureRotate->signal_angle_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Rotate_cb));
 	m_GestureDrag->signal_drag_update()  .connect(sigc::mem_fun(*this, &ArchipelagoUI::Drag_cb));
 	m_GestureDrag->signal_drag_begin()   .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragStart_cb));
 	m_GestureDrag->signal_drag_end()     .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragEnd_cb));
@@ -204,18 +239,24 @@ bool ArchipelagoUI::on_button_release_event(GdkEventButton *ev) {
 
 bool ArchipelagoUI::on_scroll_event(GdkEventScroll *ev) {
 	model.Swipe(ev->delta_x, -ev->delta_y);
+    RefreshMouseCoordinates();
     return 1;
 }
 
-#define SIGN(x) (((x) < 0) ? -1 : 1)
+#define SIGN(x) (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
 
 void ArchipelagoUI::Zoom_cb(double now) {
     static double last = 1;
-    if(0.91 < now && now < 1.10) { // ignore first 10%
-        last = now;
-        return ;
+    model.tmpzoom = m_GestureZoom->get_scale_delta();
+
+    // if(0.991 < now && now < 1.010) { // ignore first 1%
+    if(abs(now-1) > 0.05) {
+    	model.Zoom(SIGN(now - last));
+        RefreshMouseCoordinates();
+	    std::cout<<"ZOOM "<<now<<"\n";
+        // last = now;
+        // return ;
     }
-	model.Zoom(SIGN(now - last));
 	last = now;
 }
 
@@ -233,5 +274,36 @@ void ArchipelagoUI::Drag_cb(double dx, double dy) {
 
 void ArchipelagoUI::Swipe_cb(double vx, double vy) {
 	model.Swipe(0.2*vx, 0.2*vy);
-	std::cout<<"here\n";
+	std::cout<<"SWIPE\n";
+}
+
+void ArchipelagoUI::Rotate_cb(double now, double angle_delta) {
+    static double last = 0;
+    if(abs(now) > 0.05) {
+        model.Rotate(SIGN(now - last));
+        RefreshMouseCoordinates();
+
+        // model.deg += SIGN(now-last);
+        // model.deg = std::fmod(model.deg, 360);
+        // model.queue_draw();
+        std::cout<<"ROTATE "<<model.deg<<"\n";
+    }
+    last = now;
+}
+
+bool ArchipelagoUI::on_timeout() {
+    // int x, y; model.get_pointer(x, y);
+    // messages.set_label("x: " + std::to_string(x) + " y: " + std::to_string(y));
+    return 1;
+}
+
+bool ArchipelagoUI::on_motion_notify_event(GdkEventMotion*event) {
+    RefreshMouseCoordinates();
+    return 1;
+}
+
+void ArchipelagoUI::RefreshMouseCoordinates() {
+    int x, y; model.get_pointer(x, y);
+    Coord2D c = model.MouseXY_to_ArchipelagoXY({double(x), double(y)});
+    messages.set_label("x: " + std::to_string(c.x) + " y: " + std::to_string(c.y));
 }

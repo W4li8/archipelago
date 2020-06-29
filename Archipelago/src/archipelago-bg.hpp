@@ -23,10 +23,12 @@ class Archipelago : public Gtk::DrawingArea {
    ~Archipelago(void) = default;
 
   public:
-    void OpenFile(std::string filename);
+    bool OpenFile(std::string filename);
     void SaveFile(std::string filename);
     // void Edit(void); //or design
-
+	// void rotate(double angle_deg);
+	double deg{0}, lastdeg{0};
+	double tmpzoom{1}, tmprotate{0};
     // std::map<uint, uint> pair;
     std::map<uint, Zone> zones;
 	std::vector<std::pair<uint, uint>> links;
@@ -58,13 +60,14 @@ class Archipelago : public Gtk::DrawingArea {
     Cairo::Matrix view;
 	public:
 	void Zoom(double sign);
+	void Rotate(double sign);
 	void Swipe(double dx, double dy);
 
 
 
 	bool moveFlag{0}, resizeFlag{0}, connectFlag{0}, removeFlag{0};
 	void ResetFlags(void) {
-		moveFlag=0; resizeFlag=0; connectFlag=0; removeFlag=0;
+		moveFlag=0; resizeFlag=0; connectFlag=0; removeFlag=0; tmpline=0;
 	}
 	void movemenu(void) { moveFlag = 1;}
 	void resizemenu(void) { resizeFlag = 1;}
@@ -83,7 +86,7 @@ class Archipelago : public Gtk::DrawingArea {
 
 	std::pair<uint, uint> newlink; // make tuple and include distance
     void Reset(void);
-	double m_zoom, scale, xoffset, yoffset;
+	double m_zoom, scale, Tx, Ty, Rz;
 
 	public:void ResetView(void);
 	void on_button_press_event2(int button, Coord2D pos) ;
@@ -92,6 +95,9 @@ class Archipelago : public Gtk::DrawingArea {
 	void UpdateCoordinates(void);
     double width, height;
 	Coord2D center;
+	//for drag tmp line
+	bool tmpline{0};
+	Coord2D tmpcoord{0,0};
 
 	public: Coord2D MouseXY_to_ArchipelagoXY(Coord2D mouse);
 };
