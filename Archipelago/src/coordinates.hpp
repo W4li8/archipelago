@@ -53,6 +53,7 @@ struct Coord2D {
     double norm(void) const { return sqrt(x*x + y*y); }
 
     friend bool operator==(const Coord2D& lhs, const Coord2D& rhs);
+    std::string to_string() const;
     friend std::ostream& operator<<(std::ostream& os, const Coord2D& me);
 };
 using Vector2D = Coord2D;

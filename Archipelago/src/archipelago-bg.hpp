@@ -39,14 +39,16 @@ class Archipelago : public Gtk::DrawingArea {
     // std::string name; // city name, also used as file name
 
 
-    uint nb_zones[ZoneType::NbZoneTypes];     // number of zones/mini-islands ? can use zones.size as id
+    // uint nb_zones[ZoneType::NbZoneTypes];     // number of zones/mini-islands ? can use zones.size as id
     uint nb_links;     // number of zones/mini-islands ? can use zones.size as id
 
   private: // private methods
+    bool ZoneAllowed(uint id) const;
     bool SpacePermitsZone(Coord2D center, double radius, uint id = 0) const;
     bool SpacePermitsZone(const Zone& z0) const;
     // bool SpacePermitsZone(const Zone& z0);
-	public: void CreateZone(const Zone& z0);
+	public:
+	void CreateZone(const Zone& z0);
 	void DestroyZone(Zone& z0);
 
 	bool LinkAllowed(uint id1, uint id2);
@@ -73,7 +75,6 @@ class Archipelago : public Gtk::DrawingArea {
 	void resizemenu(void) { resizeFlag = 1;}
 	void connectmenu(void) { connectFlag = 1;}
 	void removemenu(void) { removeFlag = 1;}
-	uint selected_zone;
 	//--------------Zone DRAG-----------------//
 	void DragStart(Coord2D pos);
 	void DragUpdate(Coord2D pos);
@@ -100,6 +101,30 @@ class Archipelago : public Gtk::DrawingArea {
 	Coord2D tmpcoord{0,0};
 
 	public: Coord2D MouseXY_to_ArchipelagoXY(Coord2D mouse);
+	//     virtual bool on_motion_notify_event(GdkEventMotion*event) override {std::cout<<"MOTION\n"; return 0;}
+
+	// virtual bool on_button_press_event(GdkEventButton *ev) override {std::cout<<"PRESS\n"; return 1;}
+	// virtual bool on_button_release_event(GdkEventButton *ev) override{std::cout<<"RELEASE\n"; return 1;}
+
+	// virtual bool on_scroll_event(GdkEventScroll *ev) override{std::cout<<"SCROLL\n"; return 0;}
+
+    // virtual bool on_key_release_event(GdkEventKey* event) override{std::cout<<"KEY\n";}
+	// void AddZone(char zontype, Coord2D pos);
+	uint selected_zone;
+	Coord2D backup_center;
+	uint backup_nb_people;
+	void AddZone(char zonetype, Coord2D pos, uint nb_people = 500, uint id = 0);
+	void PrepareEditZone(Coord2D pos);
+	void EditZone(Coord2D pos);
+	std::string getEditZoneInfo(void);
+	void ValidateEditZone(Coord2D pos);
+	void RemoveZone(Coord2D pos);
+
+	void PrepareAddLink(Coord2D pos);
+	void AddLink(Coord2D pos);
+	std::string getAddLinkInfo(void);
+	void ValidateAddLink(Coord2D pos);
+	void RemoveLink(Coord2D pos);
 };
 
 // struct vache {

@@ -3,6 +3,11 @@
 #include <algorithm>
 
 
+
+std::string Coord2D::to_string() const {
+	return '('+ bsfn(x) +", "+ bsfn(y) +')';
+}
+
 std::ostream& operator<<(std::ostream& os, const Coord2D& me) { return os <<"("<< me.x <<", "<< me.y <<")"; }
 std::ostream& operator<<(std::ostream& os, const Coord3D& me) { return os <<"("<< me.x <<", "<< me.y <<", "<< me.z <<")"; }
 bool operator==(const Coord2D& lhs, const Coord2D& rhs) { return lhs.x == rhs.x && lhs.y == rhs.y; }

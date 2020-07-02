@@ -1,300 +1,278 @@
 #include "archipelago-ui.hpp"
 
-void setMargin(Gtk::Widget& widget, uint right, uint top, uint left, uint bottom) {
-	widget.set_margin_right(right);
-	widget.set_margin_top(top);
-	widget.set_margin_left(left);
-	widget.set_margin_bottom(bottom);
-}
-
-
-std::string StripPathFromFileName(std::string filename) {
-	for(auto it = find(filename.begin(), filename.end(), '/'); it < filename.end();
-        it = find(filename.begin(), filename.end(), '/')) {
-		filename.erase(filename.begin(), it+1); // strip directory
-	}
-    filename.erase(find(filename.begin(), filename.end(), '.'), filename.end()); // strip extension
-	return filename;
-}
-
-void ArchipelagoUI::OpenFile_cb(void) {
-	if(model.OpenFile(getFilename())) {
-	    setWindowTitle("Archipelago - " + StripPathFromFileName(getFilename()));
-    } else {
-        setWindowTitle("Archipelago");
-        messages.set_label("Could not open file "+ getFilename());
-    }
-}
-void ArchipelagoUI::SaveFile_cb(void) {
-	model.SaveFile(getFilename());
-	messages.set_text("file saved");
-}
-void ArchipelagoUI::ResetView_cb(void) {
-	model.ResetView();
-}
-
-void ArchipelagoUI::addmenu(char zone) {
-	std::cout<<"HERE\n";
-	switch(zone) {
-		case 'r': model.CreateZone({bs++, ZoneType::ResidentialArea, model.MouseXY_to_ArchipelagoXY({mx, my}),1000});
-		break;
-		case 't': model.CreateZone({bs++, ZoneType::TransportHub, model.MouseXY_to_ArchipelagoXY({mx, my}),100});
-		break;
-		case 'p': model.CreateZone({bs++, ZoneType::ProductionZone, model.MouseXY_to_ArchipelagoXY({mx, my}), 100});
-		break;
-	}
-
-	model.resizemenu();
-}
-
-
-void expand(Gtk::Widget& widget, bool h, bool v) {
+static void expand(Gtk::Widget& widget, bool h, bool v) {
 	widget.set_hexpand(h);
 	widget.set_vexpand(v);
 }
-void align(Gtk::Widget& widget, Gtk::Align h, Gtk::Align v){
-	widget.set_halign(h);
-	widget.set_valign(v);
-}
-void margin(Gtk::Widget& widget, int r, int t, int l, int b) {
+
+static void margin(Gtk::Widget& widget, int r, int t, int l, int b) {
 	widget.set_margin_right(r);
 	widget.set_margin_top(t);
 	widget.set_margin_left(l);
 	widget.set_margin_bottom(b);
 }
 
-
-
-// template<typename...Args>
-// void pack_start(Gtk::Box& box, Args&&...args) {
-//    (box.pack_start(args), ...);
-// }
-template<typename...Args>
-void append(Gtk::Menu& menu, Args&&...args) {
-   (menu.append(args), ...);
-	menu.show_all();
-}
-// bool ArchipelagoUI::on_timeout(void) {
-//     // model.deg +=10;
-//     // model.queue_draw();
-//     return 1;
-// 	static int i{10};
-// 	if(i) {
-// 		std::cout << i-- <<"s\n";
-// 		return 1;
-// 	} else {
-// 		std::cout <<"BOOM\n";
-// 		Gtk::Window::close();
-// 		return 0;
-// 	}
-
-// }
-bool ArchipelagoUI::on_key_release_event(GdkEventKey* event) {
+bool ArchipelagoUI::on_key_press_event(GdkEventKey* event) {
+    if(!filepath.has_focus())
     switch(gdk_keyval_to_upper(event->keyval)) {
-      case GDK_KEY_P: addmenu('p');
+      case GDK_KEY_P: if(event->state & GDK_SHIFT_MASK) AddMenuSelect_cb('P');
         break;
-      case GDK_KEY_R: addmenu('r');
+      case GDK_KEY_R: if(event->state & GDK_SHIFT_MASK) AddMenuSelect_cb('R');
         break;
-      case GDK_KEY_T: addmenu('t');
+      case GDK_KEY_T: if(event->state & GDK_SHIFT_MASK) AddMenuSelect_cb('T');
         break;
-      case GDK_KEY_C: connectmenu();
+      case GDK_KEY_C:
         break;
       case GDK_KEY_O: if(event->state & GDK_CONTROL_MASK) OpenFile_cb();
         break;
       case GDK_KEY_S: if(event->state & GDK_CONTROL_MASK) SaveFile_cb();
         break;
-      case GDK_KEY_BackSpace: removemenu();
+      case GDK_KEY_W:
+      case GDK_KEY_Q: if(event->state & GDK_MOD2_MASK) hide();
+        break;
+      case GDK_KEY_BackSpace: //removemenu();
+        break;
+      case GDK_KEY_space: ResetView_cb();
         break;
       case GDK_KEY_K: if(event->state & GDK_MOD2_MASK) std::cout<<"COMMAND\n";
         break;
       default:
         messages.set_text("this key does nothing");
-    }
+
+    } else if(event->keyval == GDK_KEY_Escape) btn_open.grab_focus(); // only way to take focus off filepath
+
     return 1;
+}
+
+
+void ArchipelagoUI::PositionWidgets(void) {
+
+	layout.attach(btn_info, 0, 0);
+
+	layout.attach(filesystem, 1, 0);
+
+	filesystem.pack_start(filepath, Gtk::PACK_SHRINK);
+	filesystem.pack_start(btn_open, Gtk::PACK_SHRINK);
+	filesystem.pack_start(btn_save, Gtk::PACK_SHRINK);
+
+	layout.attach(spacer, 2, 0);
+	expand(spacer, 1, 0);
+
+	layout.attach(btn_view, 3, 0);
+
+	layout.attach(city_canvas, 0, 2, 4, 1);
+	expand(city_canvas, 1, 1);
+
+	layout.attach(editor_frame, 0, 3, 4, 1);
+	editor_frame.add(editor);
+
+	editor.pack_start(tmpstuff);
+	editor.pack_start(btn_zone,   Gtk::PACK_SHRINK);
+	editor.pack_start(btn_link,   Gtk::PACK_SHRINK);
+	editor.pack_start(btn_add_menu, Gtk::PACK_SHRINK);
+	editor.pack_start(btn_add,    Gtk::PACK_SHRINK);
+	editor.pack_start(btn_edit,   Gtk::PACK_SHRINK);
+	editor.pack_start(btn_remove, Gtk::PACK_SHRINK);
+	editor.pack_start(messages);
+
+
+	margin(btn_info, 2, 2, 2, 2);
+
+	margin(filesystem, 0, 2, 0, 2);
+	margin(filepath,   3, 0, 0, 0);
+	margin(btn_open,   2, 0, 0, 0);
+	margin(btn_save,   0, 0, 0, 0);
+
+	margin(btn_view, 2, 2, 2, 2);
+
+	margin(city_canvas, 2, 0, 2, 0);
+
+	margin(editor_frame, 2, 2, 2, 6);
+	margin(tmpstuff,	 2, 0, 5, 6);
+	margin(btn_zone, 	 1, 0, 1, 6);
+	margin(btn_link, 	 2, 0, 1, 6);
+	margin(btn_add, 	 1, 0, 2, 6);
+	margin(btn_edit, 	 1, 0, 1, 6);
+	margin(btn_remove, 	 1, 0, 1, 6);
+	margin(messages, 	 5, 0, 2, 6);
+}
+
+void ArchipelagoUI::SetupWidgets(void) {
+
+	btn_info.set_image(img_info);
+
+	filepath.set_size_request(240,0);
+    filepath.set_placeholder_text("File name");
+
+	btn_open.set_label("Open");
+	btn_save.set_label("Save");
+
+	btn_view.set_image(img_view);
+
+    city_canvas.set_size_request(300, 300);
+
+	editor_frame.set_label(" Archipelago Editor ");
+	editor_frame.set_label_align(0.02, 0.5);
+
+	tmpstuff.set_width_chars(21);
+	tmpstuff.set_xalign(0.05);
+
+	btn_zone.set_image(img_zone);
+	btn_link.set_image(img_link);
+	btn_add_menu.set_menu(add_menu);
+	add_menu.append(r);
+	add_menu.append(t);
+	add_menu.append(p);
+	add_menu.show_all();
+	btn_add_menu.set_direction(Gtk::ARROW_UP);
+	btn_add.set_image(img_add);
+	btn_edit.set_image(img_edit);
+	btn_remove.set_image(img_remove);
+
+	messages.set_width_chars(21);
+	messages.set_xalign(0.95);
+}
+
+void ArchipelagoUI::ConnectSignals(void) {
+
+    city.add_events(Gdk::POINTER_MOTION_MASK | Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK | Gdk::SMOOTH_SCROLL_MASK);
+	btn_info.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::DisplayInfo_cb));
+
+	btn_open.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::OpenFile_cb));
+	btn_save.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::SaveFile_cb));
+
+	btn_view.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::ResetView_cb));
+
+	btn_zone.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::EditZone_cb));
+	btn_link.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::EditLink_cb));
+	btn_add_menu.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::AddMenu_cb));
+    r.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), 'R'));
+    t.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), 'T'));
+    p.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), 'P'));
+	btn_add .signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Add_cb));
+	btn_edit.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Edit_cb));
+	btn_remove.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Remove_cb));
+
+
+	gesture_zoom = Gtk::GestureZoom::create(city_canvas);
+	gesture_zoom->signal_scale_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Zoom_cb));
+
+	gesture_rotate = Gtk::GestureRotate::create(city_canvas);
+	gesture_rotate->signal_angle_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Rotate_cb));
+
+	gesture_drag = Gtk::GestureDrag::create(city_canvas);
+	gesture_drag->signal_drag_begin()   .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragBegin_cb));
+	gesture_drag->signal_drag_update()  .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragUpdate_cb));
+	gesture_drag->signal_drag_end()     .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragEnd_cb));
 }
 
 
 ArchipelagoUI::ArchipelagoUI() {
 
+    Gtk::Window::set_title("Archipelago City");
+    Gtk::Window::resize(400,400);
 
-    setWindowTitle("Archipelago");
-    setWindowSize(400,400);
-		// open.set_image_from_icon_name("document-open", Gtk::ICON_SIZE_BUTTON);
-	Glib::signal_timeout().connect(sigc::mem_fun(*this, &ArchipelagoUI::on_timeout), 50 );
-    model.add_events(Gdk::POINTER_MOTION_MASK | Gdk::KEY_RELEASE_MASK);
-    // model.signal_key_press_event().connect(sigc::mem_fun(*this, &MyWindow::onKeyPress), false);
-
-	// expand(controls, 1, 0);
-	// expand(ctrl, 1, 0);
-	// pack_start(controls, file, filename, open, save, view);
-	// align(file, Gtk::Align::ALIGN_CENTER, Gtk::Align::ALIGN_CENTER);
-	// align(filename, Gtk::Align::ALIGN_FILL, Gtk::Align::ALIGN_CENTER);
-	// align(open, Gtk::Align::ALIGN_FILL, Gtk::Align::ALIGN_CENTER);
-	// align(save, Gtk::Align::ALIGN_FILL, Gtk::Align::ALIGN_CENTER);
-	// align(view, Gtk::Align::ALIGN_CENTER, Gtk::Align::ALIGN_CENTER);
-	expand(file, 0, 0);
-	expand(filename, 0, 0);
-	filename.set_size_request(250,0);
-	margin(file, 10, 2, 10, 2);
-	margin(filename, 2, 1, 0, 1);
-	margin(open, 0, 2, 1, 2);
-	margin(save, 1, 2, 1, 2);
-	margin(view, 2, 2, 1, 2);
-	expand(open, 0, 0);
-	expand(save, 0, 0);
-	expand(spacer, 1, 0);
-	expand(view, 0, 0);
-	// margin(controls, 2, 2, 2 , 2);
-	layout.set_row_homogeneous(0);
-	layout.set_column_homogeneous(0);
-	open.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::OpenFile_cb));
-	save.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::SaveFile_cb));
-/*
-    status.set_label("add/remove");
-    controls.pack_start(status);
-    // elements.set_model(Gtk::ListStore::create(m_Columns));
-    elements.append("A");
-    elements.append("B");
-    elements.append("C");
-    controls.pack_start(elements);
-    modifier.set_label("+/–");
-    controls.pack_start(modifier);
-    // performance.set_label("label");
-    // controls.pack_start(rating);
-    controls.pack_start(view);
-	*/
-
-	view.set_image(magzoom);
-	view.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::ResetView_cb));
-
-    model.set_size_request(200,200);
-	expand(model, 1, 1);
-	margin(model, 2, 0, 2, 0);
-
-
-	expand(messages, 1, 0);
-    messages.set_label("msg");
-	margin(messages, 2, 2, 2, 2);
-	// file.set_markup("<b>File</b>");
-	// open.add_pixlabel("info.xpm", "cool button");
-	// magzoom.set(Gdk::Pixbuf::create_from_file("/Users/fs/Developer/Projects/EPFL MT BA1 2020 Archipelago/Archipelago/img/zoom_icon.png"));
-	// view.set_icon_widget(magzoom, "ResetView");
-	// view.set_relief(RELIEF_NORMAL);
-	// view.set_always_show_image();
-	// open.set_icon_name("document-open");
-	// open.set_use_underline(1);
-	// layout.attach(controls, 0, 0);
-	// layout.attach(ctrl, 0, 0);
-	layout.attach(file, 0, 0);
-	layout.attach(filename, 1, 0);
-	layout.attach(open, 2, 0);
-	layout.attach(save, 3, 0);
-	layout.attach(spacer, 4, 0);
-	layout.attach(view, 5, 0);
-	layout.attach(model, 0, 1, 6);
-	layout.attach(messages, 0, 2, 6);
+	PositionWidgets();
+	SetupWidgets();
+	ConnectSignals();
 
 	Gtk::Window::add(layout);
 	Gtk::Window::show_all();
-
-	m_GestureZoom = Gtk::GestureZoom::create(model);
-	m_GestureRotate = Gtk::GestureRotate::create(model);
-	m_GestureDrag = Gtk::GestureDrag::create(model);
-
-	m_GestureZoom->signal_scale_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Zoom_cb));
-	m_GestureRotate->signal_angle_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Rotate_cb));
-	m_GestureDrag->signal_drag_update()  .connect(sigc::mem_fun(*this, &ArchipelagoUI::Drag_cb));
-	m_GestureDrag->signal_drag_begin()   .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragStart_cb));
-	m_GestureDrag->signal_drag_end()     .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragEnd_cb));
-
-	append(pop_menu, move, resize, connect, add, remove);
-	add.set_submenu(add_menu);
-	append(add_menu, r, t, p);
-
-    move.signal_activate()   .connect(sigc::mem_fun(*this, &ArchipelagoUI::movemenu));
-    resize.signal_activate() .connect(sigc::mem_fun(*this, &ArchipelagoUI::resizemenu));
-    connect.signal_activate().connect(sigc::mem_fun(*this, &ArchipelagoUI::connectmenu));
-    r.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::addmenu), 'r'));
-    t.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::addmenu), 't'));
-    p.signal_activate()		 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::addmenu), 'p'));
-    remove.signal_activate() .connect(sigc::mem_fun(*this, &ArchipelagoUI::removemenu));
+	btn_add_menu.hide();
 }
 
 
 
-bool ArchipelagoUI::on_button_press_event(GdkEventButton *ev) {
-	mx = ev->x; my = ev->y;
-    model.on_button_press_event2(ev->button, model.MouseXY_to_ArchipelagoXY({mx, my}));
-	return 1;
+void ArchipelagoUI::DisplayInfo_cb(void) {
+	//TODO
 }
 
-bool ArchipelagoUI::on_button_release_event(GdkEventButton *ev) {
-	mx = ev->x; my = ev->y;
-    model.on_button_release_event2(ev->button, model.MouseXY_to_ArchipelagoXY({mx, my}));
-	if(ev->button == 3) {
-		pop_menu.popup(ev->button, ev->time);
+void ArchipelagoUI::OpenFile_cb(void) {
+	if(city.OpenFile(getFilename())) {
+	    Gtk::Window::set_title("Archipelago City - " + StripPathFromfilepath(getFilename()));
+    } else {
+        Gtk::Window::set_title("Archipelago City");
+        messages.set_label("Could not open file "+ getFilename());
+    }
+}
+
+void ArchipelagoUI::SaveFile_cb(void) {
+	city.SaveFile(getFilename());
+	messages.set_text("file saved");
+}
+
+void ArchipelagoUI::ResetView_cb(void) {
+	city_canvas.ResetView();
+}
+
+void ArchipelagoUI::EditZone_cb(void) {
+
+	if(btn_zone.get_active()) {
+		btn_link.set_active(0);
+		btn_add.get_active() ? btn_add_menu.set_active(1) : void();
+	} else {
+		btn_add.set_active(0);
+		btn_edit.set_active(0);
+		btn_remove.set_active(0);
 	}
-	return 1;
+	UpdateEditorAction();
 }
 
-bool ArchipelagoUI::on_scroll_event(GdkEventScroll *ev) {
-	model.Swipe(ev->delta_x, -ev->delta_y);
-    RefreshMouseCoordinates();
-    return 1;
+void ArchipelagoUI::EditLink_cb(void) {
+
+	if(btn_link.get_active()) {
+		btn_zone.set_active(0);
+		btn_edit.set_active(0);
+	} else {
+		btn_add.set_active(0);
+		btn_edit.set_active(0);
+		btn_remove.set_active(0);
+	}
+	UpdateEditorAction();
 }
 
-#define SIGN(x) (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
-
-void ArchipelagoUI::Zoom_cb(double now) {
-    static double last = 1;
-    model.tmpzoom = m_GestureZoom->get_scale_delta();
-
-    // if(0.991 < now && now < 1.010) { // ignore first 1%
-    if(abs(now-1) > 0.05) {
-    	model.Zoom(SIGN(now - last));
-        RefreshMouseCoordinates();
-	    std::cout<<"ZOOM "<<now<<"\n";
-        // last = now;
-        // return ;
-    }
-	last = now;
+void ArchipelagoUI::AddMenu_cb(void) {
+	btn_add_menu.get_active() ? void() : btn_add.set_active(0);
 }
 
-void ArchipelagoUI::DragStart_cb(double x, double y) {
-	model.DragStart(model.MouseXY_to_ArchipelagoXY({x, y}));
-}
-void ArchipelagoUI::DragEnd_cb(double dx, double dy) {
-	double x, y; m_GestureDrag->get_start_point(x, y);
-	model.DragEnd(model.MouseXY_to_ArchipelagoXY({x+dx, y+dy}));
-}
-void ArchipelagoUI::Drag_cb(double dx, double dy) {
-	double x, y; m_GestureDrag->get_start_point(x, y);
-	model.DragUpdate(model.MouseXY_to_ArchipelagoXY({x+dx, y+dy})); //add signal drag begin to reset
+void ArchipelagoUI::AddMenuSelect_cb(char zonetype) {
+	select = zonetype;
+	btn_add.set_active(1);
 }
 
-void ArchipelagoUI::Swipe_cb(double vx, double vy) {
-	model.Swipe(0.2*vx, 0.2*vy);
-	std::cout<<"SWIPE\n";
+void ArchipelagoUI::Add_cb(void) {
+	if(!btn_add.get_active()) { select = 0; return ; }
+
+	btn_edit.set_active(0);
+	btn_remove.set_active(0);
+
+	if(!select && btn_zone.get_active()) {
+		btn_add_menu.set_active(1);
+	}
+	UpdateEditorAction();
 }
 
-void ArchipelagoUI::Rotate_cb(double now, double angle_delta) {
-    static double last = 0;
-    if(abs(now) > 0.05) {
-        model.Rotate(SIGN(now - last));
-        RefreshMouseCoordinates();
+void ArchipelagoUI::Edit_cb(void) {
+	if(!btn_edit.get_active()) return ;
 
-        // model.deg += SIGN(now-last);
-        // model.deg = std::fmod(model.deg, 360);
-        // model.queue_draw();
-        std::cout<<"ROTATE "<<model.deg<<"\n";
-    }
-    last = now;
+	btn_add.set_active(0);
+	btn_remove.set_active(0);
+
+	if(btn_link.get_active()) {
+		btn_link.set_active(0);
+	} else {
+		btn_zone.get_active() ? void() : btn_zone.set_active(1);
+	}
+	UpdateEditorAction();
 }
 
-bool ArchipelagoUI::on_timeout() {
-    // int x, y; model.get_pointer(x, y);
-    // messages.set_label("x: " + std::to_string(x) + " y: " + std::to_string(y));
-    return 1;
+void ArchipelagoUI::Remove_cb(void) {
+	if(!btn_remove.get_active()) return ;
+
+	btn_add.set_active(0);
+	btn_edit.set_active(0);
+
+	UpdateEditorAction();
 }
 
 bool ArchipelagoUI::on_motion_notify_event(GdkEventMotion*event) {
@@ -302,8 +280,115 @@ bool ArchipelagoUI::on_motion_notify_event(GdkEventMotion*event) {
     return 1;
 }
 
+bool ArchipelagoUI::on_scroll_event(GdkEventScroll *ev) {
+	city_canvas.Swipe(ev->delta_x, -ev->delta_y);
+    RefreshMouseCoordinates();
+    return 1;
+}
+
+void ArchipelagoUI::Rotate_cb(double now, double angle_delta) {
+    static double last = 0;
+    if(abs(now) > 0.01) {
+        city_canvas.Rotate(SIGN(now - last));
+        RefreshMouseCoordinates();
+    }
+    last = now;
+}
+
+void ArchipelagoUI::Zoom_cb(double now) {
+    static double last = 1;
+    city_canvas.tmpzoom = gesture_zoom->get_scale_delta();
+
+    if(abs(now - 1) > 0.01) {
+    	city_canvas.Zoom(SIGN(now - last));
+        RefreshMouseCoordinates();
+    }
+	last = now;
+}
+
+
+
+bool ArchipelagoUI::on_button_press_event(GdkEventButton *ev) {
+    if(filepath.has_focus()) btn_open.grab_focus(); // one way to take focus off filepath entry
+
+	if(ev->button == 1) {
+		switch(editor_action) {
+		  case ADD_ZONE:
+			city.AddZone(select, city_canvas.MouseXY_to_ArchipelagoXY({ev->x, ev->y}));
+			break;
+		  case REMOVE_ZONE:
+		  	city.RemoveZone(city_canvas.MouseXY_to_ArchipelagoXY({ev->x, ev->y}));
+			break;
+		  case REMOVE_LINK:
+		  	city.RemoveLink(city_canvas.MouseXY_to_ArchipelagoXY({ev->x, ev->y}));
+			break;
+		  default: ;
+		}
+	}
+	return 0;
+}
+
+
+void ArchipelagoUI::DragBegin_cb(double x, double y) {
+
+	switch(editor_action) {
+	  case EDIT_ZONE:
+	  	city.PrepareEditZone(city_canvas.MouseXY_to_ArchipelagoXY({x, y}));
+		break;
+	  case ADD_LINK:
+	  	city.PrepareAddLink(city_canvas.MouseXY_to_ArchipelagoXY({x, y}));
+	  	break;
+	  default: ;
+	}
+}
+
+void ArchipelagoUI::DragUpdate_cb(double dx, double dy) {
+	double x, y; gesture_drag->get_start_point(x, y);
+	switch(editor_action) {
+	  case EDIT_ZONE:
+	  	city.EditZone(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}));
+	  	tmpstuff.set_text(city.getEditZoneInfo());
+		break;
+	  case ADD_LINK:
+	  	city.AddLink(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}));
+		tmpstuff.set_text(city.getAddLinkInfo());
+		break;
+	  default: ;
+	}
+}
+
+void ArchipelagoUI::DragEnd_cb(double dx, double dy) {
+	double x, y; gesture_drag->get_start_point(x, y);
+	switch(editor_action) {
+	  case EDIT_ZONE:
+	  	city.ValidateEditZone(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}));
+		break;
+	  case ADD_LINK:
+	  	city.ValidateAddLink(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}));
+	  	break;
+	  default: ;
+	}
+}
+
+
+void ArchipelagoUI::UpdateEditorAction(void) {
+
+	if(btn_zone.get_active()) {
+		if(btn_add.get_active()) 	{ editor_action = ADD_ZONE;		return ; }
+		if(btn_edit.get_active()) 	{ editor_action = EDIT_ZONE;	return ; }
+		if(btn_remove.get_active()) { editor_action = REMOVE_ZONE;	return ; }
+	}
+	if(btn_link.get_active()) {
+		if(btn_add.get_active()) 	{ editor_action = ADD_LINK;		return ; }
+		if(btn_remove.get_active()) { editor_action = REMOVE_LINK;	return ; }
+	}
+	editor_action = NONE;
+}
+
+
 void ArchipelagoUI::RefreshMouseCoordinates() {
-    int x, y; model.get_pointer(x, y);
-    Coord2D c = model.MouseXY_to_ArchipelagoXY({double(x), double(y)});
-    messages.set_label("x: " + std::to_string(c.x) + " y: " + std::to_string(c.y));
+    int x, y;
+	city_canvas.get_pointer(x, y);
+    Coord2D c = city_canvas.MouseXY_to_ArchipelagoXY({double(x), double(y)});
+    messages.set_markup("<b>x:</b> "+ bsfn(c.x) +"  <b>y:</b> "+ bsfn(c.y));
 }
