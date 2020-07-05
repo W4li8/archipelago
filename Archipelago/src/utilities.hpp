@@ -2,6 +2,9 @@ using uint = unsigned int;
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+#include <algorithm>
+
+
 #undef MIN
 #define MIN(a, b) ( ((a) < (b)) ? (a) : (b) )
 #undef MAX
@@ -14,6 +17,10 @@ using uint = unsigned int;
 #define ABS(x)	( ((x) < 0) ? -(x) : (x))
 #undef SIGN
 #define SIGN(x) ( ((x) < 0) ? -1 : ((x) > 0) ? 1 : 0 )
+
+#define BOUNDED(x, a, b) ( (a) <= (x) && (x) <= (b)) )
+
+#define watch(x) (#x) // return strin name
 
 
 template<typename T> auto min(T&& val) { return std::forward<T>(val); }

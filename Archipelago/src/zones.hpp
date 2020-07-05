@@ -3,29 +3,35 @@
 
 #include <memory>
 #include <vector>
+#include <array>
 #include <string>
 #include <cmath>
 #include "geometry.hpp"
 #include <iostream>
-#include <map>
+#include <unordered_map>
 
 using uint = unsigned int;
 
 struct Link { uint id1, id2; };
-namespace zone
-{
-    enum ZoneType : char { ResidentialArea = 'R', TransportHub = 'T', ProductionZone = 'P', NbZoneTypes = 3};
-    inline std::map<char, uint> nb_zones = {{'R', 0}, {'T', 0}, {'P', 0}};
-    static uint nbProductionZones;
-    static uint nbResidentialAreas;
-    static uint nbTransportHubs;
-}
+
 class Zone {
 
   public: // constructors etc.
-    Zone(uint id, zone::ZoneType type, Coord2D position, uint nb_people);
-   ~Zone(void) = default;
+    enum Type { NONE, ResidentialArea, TransportHub, ProductionZone, NbZoneTypes};
+    static constexpr std::array<Type, NbZoneTypes-1> Types {
+      ResidentialArea,
+      TransportHub,
+      ProductionZone
+    };
 
+    Zone(uint id, Type type, Coord2D position, uint nb_people);
+   ~Zone(void);
+
+    static inline std::unordered_map<Type, uint> Counters = {
+      {ResidentialArea, 0},
+      {TransportHub,    0},
+      {ProductionZone,  0}
+    };
 
     std::string to_string(void) const;
     friend std::ostream& operator<<(std::ostream& os, const Zone& obj);
@@ -33,8 +39,9 @@ class Zone {
 
   public:
     const uint id;       // unique identifier
-    const zone::ZoneType type; // zone classifier
+    const Type type; // zone classifier
 
+	  uint  getPopulation(void) const { return nb_people; }
 	  double  getRadius(void) const { return sqrt(nb_people); }
     Coord2D getCenter(void) const { return position; }
     void setRadius(double nb) { nb_people = nb*nb; }
@@ -52,8 +59,8 @@ class Zone {
   public:
   bool operator==(const uint& x)     const { return x == id; }
   bool operator!=(const uint& x)     const { return x != id; }
-  bool operator==(const zone::ZoneType& x) const { return x == type; }
-  bool operator!=(const zone::ZoneType& x) const { return x != type; }
+  bool operator==(const Type& x) const { return x == type; }
+  bool operator!=(const Type& x) const { return x != type; }
   Coord2D operator+(const Coord2D& v) const  { return {position.x + v.x, position.y + v.y}; }
   Coord2D operator-(const Coord2D& v) const { return {position.x - v.x, position.y - v.y}; }
   double operator*(const double& x) const { return sqrt(sqrt(nb_people)*x); }

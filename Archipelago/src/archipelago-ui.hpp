@@ -28,14 +28,14 @@ class ArchipelagoUI : public Gtk::Window {
 	ArchipelagoUI(void);
    ~ArchipelagoUI(void) = default;
 
-
+// #################################### WIDGETS ################################### //
   private: // UI Widgets
     // Gtk::Window helps;
     // Gtk::MessageDialog helper{"HELP", 1, Gtk::MESSAGE_INFO, Gtk::BUTTONS_OK};
 
 	Gtk::Grid layout;
 
-// #################################### HEADER #################################### //
+// ==================================== HEADER ==================================== //
 	Gtk::Button btn_info;
 
 	Gtk::HBox   filesystem;
@@ -50,37 +50,40 @@ class ArchipelagoUI : public Gtk::Window {
 	Gtk::Image img_info { Gdk::Pixbuf::create_from_file("./img/ui/info.png") };
 	Gtk::Image img_view {Gdk::Pixbuf::create_from_file("./img/ui/view.png")  };
 
-// ############################### ARCHIPELAGO CITY ############################### //
-    Archipelago city_canvas;
+// =============================== ARCHIPELAGO CITY =============================== //
+	Gtk::Label   city_rating;
+    Archipelago  city_canvas;
     Archipelago& city = city_canvas;
 
-// #################################### EDITOR #################################### //
+// ==================================== EDITOR ==================================== //
 	Gtk::Frame editor_frame;
 	Gtk::HBox  editor;
     Gtk::Label tmpstuff;
 	Gtk::ToggleButton btn_zone;
 	Gtk::ToggleButton btn_link;
+	Gtk::MenuButton   btn_add_menu; // mostly hidden button
 	Gtk::ToggleButton btn_add;
 	Gtk::ToggleButton btn_edit;
 	Gtk::ToggleButton btn_remove;
-    Gtk::Label messages;
+    Gtk::Label mouse_pos;
 
-	Gtk::MenuButton btn_add_menu; // hidden button
-	Gtk::Menu 		add_menu;	  // shows under certain conditions
-	Gtk::MenuItem 	r{"residentialarea"};
-	Gtk::MenuItem 	t{"transporthub"};
-	Gtk::MenuItem 	p{"productionzone"};
+	Gtk::Menu 		add_menu;
+	Gtk::MenuItem 	ResidentialArea;
+	Gtk::MenuItem 	TransportHub;
+	Gtk::MenuItem 	ProductionZone;
 
 	Gtk::Image img_zone { Gdk::Pixbuf::create_from_file("./img/ui/zone.png") };
 	Gtk::Image img_link { Gdk::Pixbuf::create_from_file("./img/ui/link.png") };
+	Gtk::Image img_add_menu { Gdk::Pixbuf::create_from_file("./img/ui/add.png") };
 	Gtk::Image img_add  { Gdk::Pixbuf::create_from_file("./img/ui/add.png")  };
 	Gtk::Image img_edit { Gdk::Pixbuf::create_from_file("./img/ui/edit.png") };
 	Gtk::Image img_remove { Gdk::Pixbuf::create_from_file("./img/ui/remove.png") };
 
+// #################################### SIGNALS ################################### //
   private: // Signals
-	virtual bool on_key_press_event(GdkEventKey* event) override;
+  	bool KeyboardShortcuts_cb(GdkEventKey*);// { return 1; }
 
-// #################################### HEADER #################################### //
+// ==================================== HEADER ==================================== //
 	void DisplayInfo_cb(void);
 
 	void OpenFile_cb(void);
@@ -88,29 +91,30 @@ class ArchipelagoUI : public Gtk::Window {
 
 	void ResetView_cb(void);
 
-// ############################### ARCHIPELAGO CITY ############################### //
+// =============================== ARCHIPELAGO CITY =============================== //
 	virtual bool on_motion_notify_event(GdkEventMotion*event) override;
 	virtual bool on_scroll_event(GdkEventScroll *ev) override;
 	Glib::RefPtr<Gtk::GestureRotate> gesture_rotate;
 	void Rotate_cb(double vx, double vy);
-	Glib::RefPtr<Gtk::GestureZoom>   gesture_zoom;
+	Glib::RefPtr<Gtk::GestureZoom> gesture_zoom;
 	void Zoom_cb(double change);
 
 	virtual bool on_button_press_event(GdkEventButton *ev) override;
-  	Glib::RefPtr<Gtk::GestureDrag>   gesture_drag;
-	void DragBegin_cb(double dx, double dy);
+  	Glib::RefPtr<Gtk::GestureDrag> gesture_drag;
+	void DragBegin_cb(double x, double y);
 	void DragUpdate_cb(double dx, double dy);
 	void DragEnd_cb(double dx, double dy);
 
-// #################################### EDITOR #################################### //
+// ==================================== EDITOR ==================================== //
 	void EditZone_cb(void);
 	void EditLink_cb(void);
 	void Add_cb(void);
 	void AddMenu_cb(void);
-	void AddMenuSelect_cb(char zonetype);
+	void AddMenuSelect_cb(Zone::Type choice);
 	void Edit_cb(void);
 	void Remove_cb(void);
 
+// ##################################### OTHER #################################### //
   private: // Methods
     void RefreshMouseCoordinates(void);
 	std::string getFilename(void) { return filepath.get_text(); }
@@ -120,9 +124,11 @@ class ArchipelagoUI : public Gtk::Window {
 	void ConnectSignals(void);
 
   private:
-	uint editor_action;
-	enum { NONE, ADD_ZONE, EDIT_ZONE, REMOVE_ZONE, ADD_LINK, REMOVE_LINK };
-	void UpdateEditorAction();
+	enum Archipelago::EditorOptions editor_action;
+	void UpdateEditorAction(void);
+	void ResetEditor(void);
+	bool dispinfo{0};
 
-	int select=0;
+	enum Zone::Type add_menu_choice;
+
 };
