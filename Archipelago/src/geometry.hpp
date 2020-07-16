@@ -17,6 +17,7 @@ class Point2D : public Coord2D {
 };
 
 double DistancePoint2Point(Coord2D P, Coord2D Q);
+float fDistancePoint2Point(Coord2D P, Coord2D Q);
 double DistancePoint2Segment(Coord2D P, Coord2D A, Coord2D B);
 double DistancePoint2Ray(Coord2D P, Coord2D A, Coord2D B);
 double DistancePoint2Line(Coord2D P, Coord2D A, Coord2D B);

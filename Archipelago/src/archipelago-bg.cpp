@@ -70,6 +70,7 @@ bool Archipelago::OpenFile(std::string filename) {
     }
     file.close();
     ComputePerformance();
+    std::cout<<"init success\n";
     return 1;
 }
 
@@ -98,8 +99,8 @@ void Archipelago::SaveFile(std::string filename) {
     }
     file <<"\n# Links\n";
     file << links.size() <<'\n';
-    for(auto& [id1, id2, speed] : links) {
-        file <<'\t'<< id1 <<' '<< id2 <<'\n';
+    for(auto& link : links) {
+        file <<'\t'<< link.id1 <<' '<< link.id2 <<'\n';
     }
     file.close();
 }
@@ -117,8 +118,8 @@ bool Archipelago::SpacePermitsZone(Coord2D center, double radius, uint id) const
         }
     }
     // for(auto& [id1, id2] : links) {
-    for(auto& [id1, id2, speed] : links) {
-        if(not SpacePermitsLink(id1, id2)) {
+    for(auto& link : links) {
+        if(not SpacePermitsLink(link.id1, link.id2)) {
             return false;
         }
     }
@@ -195,9 +196,14 @@ bool Archipelago::ConnectZones(uint id1, uint id2) {
     z1.AddLink(z2.id);
     z2.AddLink(z1.id);
     */
+
     if(LinkAllowed(id1, id2) and SpacePermitsLink(id1, id2)) {
-        uint speed = (zones.at(id1).type == Zone::TransportHub && zones.at(id2).type == Zone::TransportHub) ? 2 : 1;
-        links.push_back({id1, id2, speed}); // check for existence
+        float speed = (zones.at(id1).type == Zone::TransportHub && zones.at(id2).type == Zone::TransportHub) ? 2 : 1;
+        links.push_back({id1, id2, speed, fDistancePoint2Point(zones.at(id1).getCenter(), zones.at(id2).getCenter())}); // check for existence
+
+
+        // auto f1 = [id2](uint id) { return id == id2; };
+        // std::cout<<"-- -- -- "; Dijkstra(zones.at(id1), id2);for(auto zone : connection) std::cout<<zone<<' ';std::cout<<'\n';
         // nb_links += 1;
         // ComputePerformance();
         queue_draw();
@@ -394,9 +400,9 @@ bool Archipelago::AddLink(Coord2D position, EditState state) {
 bool Archipelago::RemoveLink(Coord2D position) {
     if(!IdentifyZoneFromXY(position)) {
         // for(auto& [id1, id2] : links) {
-        for(auto& [id1, id2, speed] : links) {
-            if(DistancePoint2Segment(position, zones.at(id1).getCenter(), zones.at(id2).getCenter()) < 5) {
-                DisconnectZones(zones.at(id1), zones.at(id2));
+        for(auto& link : links) {
+            if(DistancePoint2Segment(position, zones.at(link.id1).getCenter(), zones.at(link.id2).getCenter()) < 5) {
+                DisconnectZones(zones.at(link.id1), zones.at(link.id2));
                 ComputePerformance();
                 return 1;
             }
@@ -405,150 +411,6 @@ bool Archipelago::RemoveLink(Coord2D position) {
     return 0;
 }
 
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%TODO%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-// void Archipelago::PrepareEditZone(Coord2D pos) {
-
-//     for(auto& [key, zone] : zones) {
-//         if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()+5 &&
-//            DistancePoint2Point(pos, zone.getCenter()) > zone.getRadius()-5) {
-//             selected_zone = key;
-//             offset = pos - zone.getCenter();
-//             origin = zone.getCenter();
-//             nb = zone.getRadius();
-//             resizeFlag = 1;
-//             break;
-//         } else if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()-5) {
-//             selected_zone = key;
-//             offset = pos - zone.getCenter();
-//             origin = zone.getCenter();
-//             moveFlag = 1;
-//             break;
-//         }
-//     }
-// }
-// void Archipelago::EditZone(Coord2D pos) {
-//     if(resizeFlag) {
-//         zones.at(selected_zone).setRadius(CLAMP(DistancePoint2Point(origin, pos), 10, 300));
-//         queue_draw();
-//     } else if(moveFlag) {
-//         zones.at(selected_zone).setCenter(pos - offset);
-//         queue_draw();
-//     }
-// }
-// void Archipelago::ValidateEditZone(Coord2D pos) {
-//     if(resizeFlag or moveFlag)
-//     if(not SpacePermitsZone(zones.at(selected_zone))) {
-//         zones.at(selected_zone).setCenter(origin);
-//         zones.at(selected_zone).setRadius(nb);
-//         queue_draw();
-//     }
-//     selected_zone = 0;
-//     resizeFlag = 0;
-//     moveFlag = 0;
-// }
-
-
-
-
-// void Archipelago::PrepareAddLink(Coord2D pos) {
-//     for(auto& [key, zone] : zones) {
-//         if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
-//             selected_zone = key;
-//             // offset = pos - zone.getCenter();
-//             // origin = zone.getCenter();
-//             connectFlag = 1;
-//             break;
-//         }
-//     }
-// }
-// void Archipelago::AddLink(Coord2D pos) {
-//     if(connectFlag) {
-//         tmpcoord = pos;
-//         queue_draw();
-//     }
-// }
-// void Archipelago::ValidateAddLink(Coord2D pos) {
-//     if(connectFlag)
-//     for(auto& [key, zone] : zones) {
-//         if(key != selected_zone && DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
-//             ConnectZones(selected_zone, zone.id);
-//             //std::cout<<"connected: "<<selected_zone<<" and "<<key<<'\n';
-//             break;
-//         }
-//     }
-//     queue_draw();
-//     selected_zone = 0;
-//     connectFlag = 0;
-// }
-
-
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%TODO
-
-// void Archipelago::DragStart(Coord2D pos) {
-
-//     for(auto& [key, zone] : zones) {
-//         if(DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
-//             selected_zone = key;
-//             offset = pos - zone.getCenter();
-//             origin = zone.getCenter();
-//             nb = zone.getRadius();
-//             break;
-//         }
-//     }
-// }
-
-// void Archipelago::DragUpdate(Coord2D pos) {
-//     if(moveFlag)
-//     if(selected_zone) {
-//         zones.at(selected_zone).setCenter(pos - offset);
-
-//         queue_draw();
-//     }
-//     if(resizeFlag)
-//     if(selected_zone) {
-//         zones.at(selected_zone).setRadius(CLAMP(DistancePoint2Point(origin, pos), 10, 300));
-//         queue_draw();
-//     }
-//     if(connectFlag && selected_zone) {
-//         tmpline = true;
-//         tmpcoord = pos;
-//         queue_draw();
-//     }
-// }
-
-// void Archipelago::DragEnd(Coord2D pos) {
-//     if(selected_zone && (moveFlag or resizeFlag))
-//     if(not SpacePermitsZone(zones.at(selected_zone))) {
-//         zones.at(selected_zone).setCenter(origin);
-//         zones.at(selected_zone).setRadius(nb);
-//     }
-//     if(selected_zone && connectFlag)
-//     for(auto& [key, zone] : zones) {
-//         if(key != selected_zone && DistancePoint2Point(pos, zone.getCenter()) < zone.getRadius()) {
-//             if(LinkAllowed(selected_zone, key) and SpacePermitsLink(selected_zone, key)) {
-//                 ConnectZones(zones.at(selected_zone), zone);
-//                 //std::cout<<"connected: "<<selected_zone<<" and "<<key<<'\n';
-//             }
-//             break;
-//         }
-//     }
-//     ResetFlags();
-//     queue_draw();
-//     selected_zone = 0;
-// }
-
-
-/* CZ BG
-    double mindim = MIN(center.x/1.5, Oy);
-    double mwl = Ox-mindim*1.5, mwr = Ox+mindim*1.5;
-    double mht = Oy-mindim, mhb = Oy+mindim;
-    Draw(cr, {{mwl, mht}, {mwr, mht}, {mwr, Oy}, {mwl, Oy}}, {black, 0.6}, white);
-    Draw(cr, {{mwl, Oy}, {mwr, Oy}, {mwr, mhb}, {mwl, mhb}}, {black, 0.6}, red);
-    Draw(cr, {{mwl, mht}, {Ox, Oy}, {mwl, mhb}}, {black, 0.6}, blue);
-*/
 bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& cr) {
 
     cr->save();
@@ -560,10 +422,13 @@ bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& cr) {
     cr->scale(S, -S);
 
     // for(auto& [id1, id2] : links) {
-    for(auto& [id1, id2, speed] : links) {
+    cr->save();
+    for(auto& link : links) {
         // ::Draw(cr, Segment2D(zones.at(id1).getCenter(), zones.at(id2).getCenter()), (zones.at(id1).type == Zone::TransportHub && zones.at(id2) == Zone::TransportHub) ? Color(0,147,0) : black);
-        ::Draw(cr, Segment2D(zones.at(id1).getCenter(), zones.at(id2).getCenter()), (speed > 1) ? Color(0,147,0) : black);
+        cr->set_line_width((link.speed > 1) ? 2 : 1);
+        ::Draw(cr, Segment2D(zones.at(link.id1).getCenter(), zones.at(link.id2).getCenter()), ((link.marked) ? ((link.speed > 1) ? red :Color(255,123,0)) : ((link.speed > 1) ? Color(0,147,0) : black)));
     }
+    cr->restore();
     if(link_edit) ::Draw(cr, Segment2D(zones.at(selected_zone).getCenter(), varzone.getCenter()), {255, 140, 0});
 
     for(auto& [key, zone] : zones) {
@@ -606,6 +471,7 @@ void Archipelago::Draw(const Cairo::RefPtr<Cairo::Context>& cr, Zone& zone) {
         break;
       default:;
     }
+    // if(std::find(connection.begin(), connection.end(), zone.id) != connection.end()) ::Draw(cr, {c, r}, black, red);
 }
 
 void Archipelago::Reset(void) {
@@ -641,9 +507,9 @@ std::string Archipelago::InfoCoordinates(Coord2D position) {
         }
     }
     // for(auto& [id1, id2] : links) {
-    for(auto& [id1, id2, speed] : links) {
-        if(DistancePoint2Segment(position, zones.at(id1).getCenter(), zones.at(id2).getCenter()) < 5) {
-            return "Link between "+ std::to_string(id1) +" and "+ std::to_string(id2) +"\nSpeed: 0";
+    for(auto& link : links) {
+        if(DistancePoint2Segment(position, zones.at(link.id1).getCenter(), zones.at(link.id2).getCenter()) < 5) {
+            return "Link between "+ std::to_string(link.id1) +" and "+ std::to_string(link.id2) +"\nSpeed: 0";
             // return "<b>Link</b> between "+ std::to_string(id1) +" and "+ std::to_string(id2) +"\n<b>Speed:</b> 0";
         }
     }
@@ -655,15 +521,6 @@ Coord2D Archipelago::MouseXY_to_ArchipelagoXY(Coord2D mouse) {
             -1/S*(cos(Rz)*(mouse.y - Oy - Ty) - sin(Rz)*(mouse.x - Ox - Tx))};
 }
 
-
-// std::string Archipelago::getEditZoneInfo(void) {
-//     return zones.at(selected_zone).to_string();
-// }
-
-// std::string Archipelago::getAddLinkInfo(void) {
-
-//     return std::to_string(selected_zone) + " & ??\n";
-// }
 
 void Archipelago::ComputePerformance(void) {
     static int i{0};
@@ -706,8 +563,8 @@ double Archipelago::ComputeENJ(void) {
 
 double Archipelago::ComputeCI(void) {
     double result{0};
-    for(auto [id1, id2, speed] : links) {
-        result += DistancePoint2Point(zones.at(id1).getCenter(), zones.at(id2).getCenter())*MIN(zones.at(id1).getPopulation(), zones.at(id2).getPopulation())*speed;
+    for(auto link : links) {
+        result += link.distance*MIN(zones.at(link.id1).getPopulation(), zones.at(link.id2).getPopulation())*link.speed;
     }
     return result;
 }
@@ -715,98 +572,121 @@ double Archipelago::ComputeCI(void) {
 double Archipelago::ComputeMTA(void) {
     double result{0};
     for(auto id : zones_by_type.at(Zone::ResidentialArea)) {
+        std::cout<<"LOOP-2\n";
         for(auto zonetype : Zone::Types) {
-            if(zonetype != zones.at(id).type) {
-                std::cout<<"DIJKSTRA ZONE "<<id<<" look for type "<<zonetype<<'\n';
-                for(auto zone : Dijkstra(zones.at(id), 0, zonetype)) {
-                    std::cout<<zone<<' ';
-                }
-                std::cout <<'\n';
+            std::cout<<"LOOP-1\n";
+            if(zonetype != Zone::ResidentialArea) {
+                std::cout<<"loop id! "<<id<<'\n';
+                Dijkstra(zones.at(id), 0, zonetype);
+                // std::cout <<'\n';
                 result += total_time;
             }
+            std::cout<<"LOOP+1\n";
         }
+        std::cout<<"LOOP+2\n";
     }
     return result/zones_by_type.at(Zone::ResidentialArea).size();
 }
 
 
-std::vector<uint> Archipelago::Dijkstra(const Zone& z1, uint target_id, Zone::Type target_type) {
-    total_time = 0;
+void Archipelago::Dijkstra(const Zone& z1, uint target_id, Zone::Type target_type) {
+    // total_time = 0;
+    connection.clear();
+ //////////////0 DEFINE NEEDED STUFF FOR DIJKSTRA
     struct DijkstraNode {
-        bool visited; uint prev; double time;
-        DijkstraNode(bool v, uint p, double t): visited{v}, prev{p}, time{t} {}
+        bool  visited; // has it the been evaluated, RENAME DONE?
+        bool  stop;    // should outgoing connections be considered
+        float time;    // shortest access time
+        uint  prev;    // id of the node from which it was accessed the fastest
+        DijkstraNode(bool yn): visited{0}, stop{yn}, time{FLT_MAX}, prev{0} {}
     };
     std::map<uint, DijkstraNode> DijkstraNodes;
-    for(auto& [id1, id2, speed] : links) {
-        // inserts zones with links into set of zones to analyze
-        DijkstraNodes.emplace(id1, DijkstraNode(false, 0, DBL_MAX));
-        DijkstraNodes.emplace(id2, DijkstraNode(false, 0, DBL_MAX));
+
+    auto FastestAccessedUnvisitedNode = [&DijkstraNodes](void) {
+        float best_time{FLT_MAX};
+        uint  ans{0};
+        for(auto& [id, node] : DijkstraNodes) {
+            if(not node.visited and node.time < best_time) {
+                best_time = node.time;
+                ans = id;
+            }
+        }
+        return ans;
+    };
+//////////////////1 INIT STRUCTURES ---- TODO!
+    for(auto& link : links) {
+        auto [id1, id2] = link.getZones();
+        DijkstraNodes.emplace(id1, DijkstraNode(zones.at(id1).type == Zone::ProductionZone));
+        DijkstraNodes.emplace(id2, DijkstraNode(zones.at(id2).type == Zone::ProductionZone));
     }
     if(DijkstraNodes.count(z1.id)) {
+        DijkstraNodes.at(z1.id).stop = 0;
         DijkstraNodes.at(z1.id).time = 0;
-    } else return {};
-    std::cout<<__LINE__<<" Dijkstra now init, looking for id "<<target_id<<" zonetype "<<target_type<<'\n';
+    } else return ; // avoid problems with isolated zones
 
-    // uint current = z1.id;
-    bool okcontinue{1};
-    while(okcontinue) {
-        //find zone with current min time
-        uint current{0}; double current_min_time{DBL_MAX};
-        for(auto& [id, node] : DijkstraNodes) {
-            if(not node.visited && node.time < current_min_time) {
-                current_min_time = node.time;
-                current = id;
+
+///////////////2 Find Path
+    for(uint id{0}; (id = FastestAccessedUnvisitedNode()); ) {
+        // Dijkstra worked, shortest path found; reconstruct path
+        if(id == target_id or zones.at(id).type == target_type) {
+            for( ; id; (id = DijkstraNodes.at(id).prev)) {
+                connection.push_back(id);
             }
+            return ;
         }
-    // std::cout<<__LINE__<<" Dijkstra elem chosen "<<current<<'\n';
-        std::cout<<"current analysis: id "<<current<<" type "<<zones.at(current).type
-                 <<"**"<<(current == target_id) <<(zones.at(current).type == target_type)<<'\n';
-        if(current == target_id or zones.at(current).type == target_type) {
-            total_time = current_min_time;
-            std::cout<<"Dijkstra END, best time "<<total_time<<"\n";
-
-            std::vector<uint> connection{current};
-            while(DijkstraNodes.at(current).prev != 0) {
-                current = DijkstraNodes.at(current).prev;
-                connection.push_back(current);
-            } connection.push_back(z1.id);
-
-            return connection;
-        }
-        // DijkstraNodes.erase(current);
-        DijkstraNodes.at(current).visited = true;
-
-        for(auto& [id1, id2, speed] : links) {
-            // neighbour is the other of the two corresponding to current
-            uint neighbour = (current == id1) ? id2 : (current == id2) ? id1 : 0;
-
-            if(neighbour && not DijkstraNodes.at(neighbour).visited) {
-                std::cout<<"neighbour explored: id "<<neighbour<<" type "<<zones.at(neighbour).type<<'\n';
-                double time = current_min_time + DistancePoint2Point(zones.at(current).getCenter(), zones.at(neighbour).getCenter())/speed;
-
-                if(time < DijkstraNodes.at(neighbour).time) {
-                    DijkstraNodes.at(neighbour).time = time;
-                    DijkstraNodes.at(neighbour).prev = current;
-
-                    // connection.push_back(current);
-                    // total_time = time;
+        // Keep looking
+        DijkstraNodes.at(id).visited = true;
+        if(not DijkstraNodes.at(id).stop) { // condition for passing through zone, call it CanCross/Traverse()?
+            for(auto& link : links) {
+                uint neighbour = (id == link.id1) ? link.id2 : (id == link.id2) ? link.id1 : 0;
+                // DijkstraNode& neighbour = DijkstraNodes.at(tmp);
+                if(neighbour && not DijkstraNodes.at(neighbour).visited) {
+                    double time = DijkstraNodes.at(id).time + link.time;
+                    if(time < DijkstraNodes.at(neighbour).time) {
+                        DijkstraNodes.at(neighbour).time = time;
+                        DijkstraNodes.at(neighbour).prev = id;
+                    }
                 }
             }
-            //else std::cout <<"Invalid neighbour\n";
         }
-        okcontinue = 0;
-        for(auto& [id, node] : DijkstraNodes) {
-            if(not node.visited) {
-                okcontinue = 1;
-                break;
-            }
-        }
-    // std::cout<<__LINE__<<" Dijkstra elem erased "<<'\n';
+
     }
-    std::cout<<__LINE__<<" Dijkstra FAILED"<<'\n';
-    // DijkstraNodes.at(current).visited = true;
-    return {z1.id};
 }
 
 
 // PBM : CRASH map access if two separate graphs present
+
+bool Archipelago::ShortestPath(Coord2D position, EditState state) {
+    if(state != INIT && not shortest_path) return 0;
+
+    switch(state) {
+      case INIT:
+        for(auto& link : links) {
+            link.marked = false;
+        }
+        connection.clear();
+        selected_zone = IdentifyZoneFromXY(position);
+        if(selected_zone) {
+            shortest_path = 1;
+            connection.clear();
+        }
+      break;
+      case UPDATE:
+     break;
+      case END:
+        uint tmp = IdentifyZoneFromXY(position);
+        if(tmp && tmp != selected_zone) Dijkstra(zones.at(selected_zone), tmp);
+        for(int i{1}; i < connection.size(); ++i) {
+            for(auto& link : links) {
+                if((link.id1 == connection[i-1] and link.id2 == connection[i]) or (link.id2 == connection[i-1] and link.id1 == connection[i])) {
+                    link.marked = true;
+                }
+            }
+        }
+        selected_zone = 0;
+        shortest_path = 0;
+        queue_draw();
+      break;
+    }
+    return 0;
+}

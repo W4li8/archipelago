@@ -390,7 +390,8 @@ void ArchipelagoUI::DragBegin_cb(double x, double y) {
 	  	city.ModifyZone(city_canvas.MouseXY_to_ArchipelagoXY({x, y}), Archipelago::EditState::INIT); break;
 	  case Archipelago::EditorOptions::ADD_LINK:
 	  	city.AddLink(city_canvas.MouseXY_to_ArchipelagoXY({x, y}), Archipelago::EditState::INIT); break;
-	  default: ;
+	  default:
+		city.ShortestPath(city_canvas.MouseXY_to_ArchipelagoXY({x, y}), Archipelago::EditState::INIT);
 	}
 }
 
@@ -407,7 +408,8 @@ void ArchipelagoUI::DragUpdate_cb(double dx, double dy) {
 	  	city.AddLink(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::UPDATE);
 		// tmpstuff.set_text(city.getAddLinkInfo());
 		break;
-	  default: ;
+	  default:
+		city.ShortestPath(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::UPDATE);
 	}
 	tmpstuff.set_markup("<span size=\"smaller\">" + city.edit_text + "</span>");
 }
@@ -419,7 +421,8 @@ void ArchipelagoUI::DragEnd_cb(double dx, double dy) {
 	    city.ModifyZone(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END); break;
 	  case Archipelago::EditorOptions::ADD_LINK:
 	  	city.AddLink(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END); break;
-	  default: ;
+	  default:
+	  	city.ShortestPath(city_canvas.MouseXY_to_ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END);
 	}
 	dispinfo = 0;
 }

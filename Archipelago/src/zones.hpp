@@ -46,6 +46,7 @@ class Zone {
     Coord2D getCenter(void) const { return position; }
     void setRadius(double nb) { nb_people = nb*nb; }
     void setCenter(Coord2D pos) { position = pos; }
+    bool canPass(void) { return type != ProductionZone; }
 	// uint   getNbLinks(void) const { return links.size(); }
   bool LinkAllowed(uint id) { return links.size() < max_links and find(links.begin(), links.end(), id) == links.end(); }
   void AddLink(uint id) {links.push_back(id);}

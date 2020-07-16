@@ -3,6 +3,7 @@
 #include <algorithm>
 
 
+float fDistancePoint2Point(Coord2D P, Coord2D Q) {return float(DistancePoint2Point(P,Q));}
 
 std::string Coord2D::to_string() const {
 	return '('+ bsfn(x) +", "+ bsfn(y) +')';

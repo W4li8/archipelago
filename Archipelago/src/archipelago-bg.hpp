@@ -5,6 +5,7 @@
 #include <gtkmm/drawingarea.h>
 #include <string>
 #include <vector>
+#include <tuple>
 #include <map>
 class ArchipelagoUI;
 
@@ -32,15 +33,26 @@ class Archipelago : public Gtk::DrawingArea {
     std::map<uint, Zone> zones;
 	std::map<Zone::Type, std::vector<uint>> zones_by_type;
 	// std::vector<std::pair<uint, uint>> links;
-	struct Link { uint id1, id2; uint speed; };
+	struct Link {
+		uint id1, id2;
+		float speed, distance, time;
+		bool marked;
+		Link(uint id1, uint id2, float v, float d)
+		: id1{id1}, id2{id2}
+		, speed{v}, distance{d}, time{distance/speed}
+		, marked{0} {}
+		// std::tuple<uint&, uint&> getZones() { return std::make_tuple(id1, id2); }
+		std::tuple<uint&, uint&> getZones() { return {id1, id2}; }
+		// std::tuple<uint&, uint&> getZones() { return {id1, id2}; }
+	};
 	std::vector<Link> links;
 	void ComputePerformance(void);
 	double ComputeENJ(void);
 	double ComputeCI(void);
 	double ComputeMTA(void);
-	std::vector<uint> Dijkstra(const Zone& z1, uint target_id = 0, Zone::Type target_type = Zone::NONE);
-	double total_time{0};
-
+	void Dijkstra(const Zone& z1, uint target_id, Zone::Type target_type = Zone::NONE);
+// template<typename T>
+// std::vector<uint> DijkstraZone(const Zone& z1, std::vector<T>& EndCondition);
 
     // vector<Site> ; // adj_matrix; // adjacency matrix of a weighted directed graph
     // matrix<int8_t> links; // adj_matrix; // adjacency matrix of a weighted directed graph
@@ -110,7 +122,9 @@ class Archipelago : public Gtk::DrawingArea {
 	uint selected_zone;
 	Zone varzone;
 	uint IdentifyZoneFromXY(Coord2D position);
-
+	double total_time{0};
+	std::vector<uint> connection; bool shortest_path{0};
+	bool ShortestPath(Coord2D position, EditState state);
 	// struct ZoneEditor {
 	// 	uint selected_zone;
 	// 	Zone backup_zone;
