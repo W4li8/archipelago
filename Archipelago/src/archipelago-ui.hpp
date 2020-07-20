@@ -20,7 +20,8 @@
 #include <gtkmm/gesturerotate.h>
 #include <gtkmm/gesturedrag.h>
 
-#include "archipelago-bg.hpp"
+// #include "archipelago-bg.hpp"
+#include "archipelago-bg_copy.hpp"
 
 class ArchipelagoUI : public Gtk::Window {
 

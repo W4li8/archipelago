@@ -14,6 +14,7 @@ class Point2D : public Coord2D {
   public:
     Point2D(void): Coord2D() {}
     Point2D(double x, double y): Coord2D(x, y) {}
+
 };
 
 double DistancePoint2Point(Coord2D P, Coord2D Q);

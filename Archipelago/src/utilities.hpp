@@ -3,6 +3,7 @@ using uint = unsigned int;
 #define UTILITIES_H
 
 #include <algorithm>
+using uint = unsigned int;
 
 
 #undef MIN
@@ -48,10 +49,29 @@ inline std::string bsfn(double x) {
 	std::ostringstream out;
 	out.precision(2);
 
-	out << (abs(x) < 100 ? "  " : "") << (abs(x) < 10 ? "  " : "");
+	// out << (abs(x) < 100 ? "  " : "") << (abs(x) < 10 ? "  " : "");
 	out << (x < 0 ? "– " : "+ ");
     out << std::fixed << abs(x);
 
     return out.str();
 }
+template<typename T>
+std::string str(T x) { return std::to_string(x) + " "; }
+// std::string str(int x) { return std::to_string(x) + " "; }
+// std::string str(uint x) { return std::to_string(x) + " "; }
+// std::string str(float x) { return bsfn(x) + " "; }
+// std::string str(double x) { return bsfn(x) + " "; }
+// std::string str(bool x) { return x ? "1 " : "0 "; }
+#define EPS 5
+#define S_SPEED 1.0f
+#define F_SPEED 2.0f
+
+#define PRINT(x) std::cout << #x << std::endl;
+#define fnDEBUG std::cout << __PRETTY_FUNCTION__ << std::endl;
+#define fiDEBUG std::cout <<"IN "<< __FUNCTION__ << std::endl;
+#define foDEBUG std::cout <<"OUT "<< __FUNCTION__ << std::endl;
+#define lDEBUG std::cout << __LINE__ << std::endl;
+#define DEBUG(msg) std::cout <<__LINE__<< msg << std::endl;
+
+
 #endif//UTILITIES_H

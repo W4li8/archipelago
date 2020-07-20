@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cmath>
+#include "utilities.hpp"
 
 struct Coord3D {
 
@@ -37,6 +38,9 @@ struct Coord2D {
     Coord2D(double x, double y): x{x}, y{y} {}
     double x, y;
 
+    std::string getInfoString(void) { return "X: "+ str(x) +" Y: "+ str(y); }
+
+
     Coord2D operator+(const Coord2D& obj) { return {x + obj.x, y + obj.y}; }
     Coord2D operator-(const Coord2D& obj) { return {x - obj.x, y - obj.y}; }
     Coord2D operator*(const double& nb)   { return {x*nb, y*nb}; }
@@ -53,6 +57,7 @@ struct Coord2D {
     double norm(void) const { return sqrt(x*x + y*y); }
 
     friend bool operator==(const Coord2D& lhs, const Coord2D& rhs);
+    friend bool operator!=(const Coord2D& lhs, const Coord2D& rhs);
     std::string to_string() const;
     friend std::ostream& operator<<(std::ostream& os, const Coord2D& me);
 };

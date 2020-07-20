@@ -22,16 +22,19 @@ struct Color {
 
 const Color black {  0,  0,  0};
 const Color white {255,255,255};
-const Color red {255,  0,  0};
-const Color green {  0,255,  0};
-const Color blue {  0,  0,255};
+const Color red   {255,  0,  0};
+const Color orange{255,123,  0};
+const Color lgreen{  0,255,  0};
+const Color green {  0,147,  0};
+const Color blue  {  0,  0,255};
+const Color pink  {135, 35, 135};
 const Color macdefault {246,245,244};
 
-void Draw(Pencil& cr, const Point2D& P, Color line = black);
-void Draw(Pencil& cr, const Segment2D& S, Color line = black);
-void Draw(Pencil& cr, const Circle2D& C, Color line = black, Color fill = white);
-void Draw(Pencil& cr, const Triangle2D& T, Color line = black, Color fill = white);
-void Draw(Pencil& cr, const Quadrilateral2D& R, Color line = black, Color fill = white);
+void DrawPoint(Pencil& cr, const Point2D& P, Color line = black);
+void DrawSegment(Pencil& cr, const Segment2D& S, Color line = black);
+void DrawCircle(Pencil& cr, const Circle2D& C, Color line = black, Color fill = white);
+void DrawTriangle(Pencil& cr, const Triangle2D& T, Color line = black, Color fill = white);
+void DrawQuadrilateral(Pencil& cr, const Quadrilateral2D& R, Color line = black, Color fill = white);
 void Draw(Pencil& cr, const Polygon2D& Poly, Color line = black, Color fill = white);
 
 #endif//GRAPHICS_H

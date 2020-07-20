@@ -1,6 +1,6 @@
 #include "graphics.hpp"
 
-void Draw(Pencil& cr, const Point2D& P, Color dot) {
+void DrawPoint(Pencil& cr, const Point2D& P, Color dot) {
     cr->save();
 	cr->arc(P.x, P.y, 1, 0.0, 2*M_PI);
     cr->set_source_rgba(dot.red, dot.green, dot.blue, dot.alpha);
@@ -8,7 +8,7 @@ void Draw(Pencil& cr, const Point2D& P, Color dot) {
     cr->restore();
     // Draw(cr, {P, 1.0}, line, line);
 }
-void Draw(Pencil& cr, const Segment2D& S, Color line) {
+void DrawSegment(Pencil& cr, const Segment2D& S, Color line) {
 	cr->save();
 	cr->move_to(S.A.x, S.A.y);
     cr->line_to(S.B.x, S.B.y);
@@ -17,7 +17,7 @@ void Draw(Pencil& cr, const Segment2D& S, Color line) {
     cr->restore();
 }
 
-void Draw(Pencil& cr, const Circle2D& C, Color line, Color fill) {
+void DrawCircle(Pencil& cr, const Circle2D& C, Color line, Color fill) {
     cr->save();
 	cr->arc(C.center.x, C.center.y, C.radius, 0.0, 2*M_PI);
     cr->set_source_rgba(fill.red, fill.green, fill.blue, fill.alpha);
@@ -27,7 +27,7 @@ void Draw(Pencil& cr, const Circle2D& C, Color line, Color fill) {
     cr->restore();
 }
 
-void Draw(Pencil& cr, const Triangle2D& T, Color line, Color fill) {
+void DrawTriangle(Pencil& cr, const Triangle2D& T, Color line, Color fill) {
     cr->save();
     cr->move_to(T.A.x, T.A.y);
     cr->line_to(T.B.x, T.B.y);
@@ -39,7 +39,7 @@ void Draw(Pencil& cr, const Triangle2D& T, Color line, Color fill) {
     cr->stroke();
     cr->restore();
 }
-void Draw(Pencil& cr, const Quadrilateral2D& R, Color line, Color fill) {
+void DrawQuadrilateral(Pencil& cr, const Quadrilateral2D& R, Color line, Color fill) {
 
 	cr->save();
     cr->move_to(R.A.x, R.A.y);
