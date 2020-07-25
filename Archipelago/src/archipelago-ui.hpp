@@ -21,7 +21,7 @@
 #include <gtkmm/gesturedrag.h>
 
 // #include "archipelago-bg.hpp"
-#include "archipelago-bg_copy.hpp"
+#include "archipelago-bg.hpp"
 
 class ArchipelagoUI : public Gtk::Window {
 
@@ -95,23 +95,27 @@ class ArchipelagoUI : public Gtk::Window {
 // =============================== ARCHIPELAGO CITY =============================== //
 	virtual bool on_motion_notify_event(GdkEventMotion*event) override;
 	virtual bool on_scroll_event(GdkEventScroll *ev) override;
-	Glib::RefPtr<Gtk::GestureRotate> gesture_rotate;
-	void Rotate_cb(double vx, double vy);
-	Glib::RefPtr<Gtk::GestureZoom> gesture_zoom;
-	void Zoom_cb(double change);
 
-	virtual bool on_button_press_event(GdkEventButton *ev) override;
+	Glib::RefPtr<Gtk::GestureRotate> gesture_rotate;
+	void Rotate_cb(float vx, float vy);
+
+	Glib::RefPtr<Gtk::GestureZoom> gesture_zoom;
+	void Zoom_cb(float change);
+
+	// virtual bool on_button_press_event(GdkEventButton *ev) override;
+
   	Glib::RefPtr<Gtk::GestureDrag> gesture_drag;
-	void DragBegin_cb(double x, double y);
-	void DragUpdate_cb(double dx, double dy);
-	void DragEnd_cb(double dx, double dy);
+	void Drag_cb(float x, float y, Archipelago::EditState state);
+	// void DragBegin_cb(float x, float y);
+	// void DragUpdate_cb(float dx, float dy);
+	// void DragEnd_cb(float dx, float dy);
 
 // ==================================== EDITOR ==================================== //
 	void EditZone_cb(void);
 	void EditLink_cb(void);
 	void Add_cb(void);
 	void AddMenu_cb(void);
-	void AddMenuSelect_cb(Zone::Type choice);
+	void AddMenuSelect_cb(ZoneType choice);
 	void Edit_cb(void);
 	void Remove_cb(void);
 
@@ -130,6 +134,6 @@ class ArchipelagoUI : public Gtk::Window {
 	void ResetEditor(void);
 	bool dispinfo{0};
 
-	enum Zone::Type add_menu_choice;
+	ZoneType add_menu_choice;
 
 };

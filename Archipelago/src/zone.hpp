@@ -1,110 +1,91 @@
 #ifndef ZONE_HPP
 #define ZONE_HPP
 
-using ZoneId = uint;
-// class Zone;
-#include "utilities.hpp"
-#include "geometry.hpp"
-#include <array>
-#include <vector>
-#include <unordered_map>
 #include <map>
+#include <vector>
+
+#include "geometry.hpp"
+#include "utilities.hpp"
+
+
+using ZoneId = uint;
+
 class Zone {
-  public:
+  public: /* --- DEFINITIONS --------------------------------------- */
     // order defines position in map which defines reading order from file
-    enum Type { NONE, RESIDENTIAL, TRANSPORT, PRODUCTION, CNT};
-    static inline std::map< Type, std::vector<ZoneId> > Types = {
-      {RESIDENTIAL, {}},
-      {TRANSPORT,   {}},
-      {PRODUCTION,  {}}
+    enum class ZoneType { RESIDENTIAL, TRANSPORT, PRODUCTION };
+    static inline std::map< ZoneType, std::vector<ZoneId> > Types = {
+		{ZoneType::RESIDENTIAL, {}},
+		{ZoneType::TRANSPORT,   {}},
+		{ZoneType::PRODUCTION,  {}}
     };
 
-    // struct Id {
-
-    //     const uint id;
-    //     const Zone::Type type;
-
-    //     friend bool operator<(const ZoneXId& lhs, const ZoneXId& rhs) {
-    //         return lhs.id != rhs.id && lhs.type < rhs.type;
-    //     }
-    // };
-
-
-    friend std::ostream& operator<<(std::ostream& os, const Zone& obj) {
-        return os << obj.id <<' '<< obj.location.x <<' '<< obj.location.y <<' '<< obj.capacity;
+  public: /* --- PUBLIC ACCESS ----------------------------------------------- */
+    Zone(ZoneId id, ZoneType type, Coord2D xy, uint nb_people)
+    : id{id}, type{type}, location{xy}, capacity{nb_people}, neighbours{} {
+       	Counter.at(type).push_back(id);
     }
-    friend std::ostream& operator<<(std::ostream& os, const Zone::Type& type) { return os;}
-    std::string ZoneType2String(Type type) {
-        switch(type) {
-          case PRODUCTION: return "Production Zone ";
-          case TRANSPORT: return "Transport Hub ";
-          case RESIDENTIAL: return "Residential Area ";
-          default:
-            return "";
-        }
-    }
-
-    Zone(ZoneId id, Type type, Coord2D xy, uint nb)
-    : id{id}, type{type}, location{xy}, capacity{nb}/*, neighbours{{}}*/ {
-        // for(auto x : neighbours)std::cout<<x<<',';std::cout<<'\n';
-
-        if(type)Zone::Types.at(type).push_back(id);
-    }
-    // Zone(const Zone& obj)
-    // : id{obj.id}, type{obj.type}, location{obj.location}, capacity{obj.capacity}, neighbours{obj.neighbours} {
-    //     std::vector<ZoneId>& v = Zone::Types.at(type);
-    //     if(std::find(v.begin(), v.end(), id) == v.end()) {
-    //         Zone::Types.at(type).push_back(id); std::cout<<Zone::Types.at(type).size()<<" COPY"<<id<<"\n";
-    //     }
-    // }
+    Zone(const Zone& obj) = delete;
    ~Zone(void) {
-        if(type)Zone::Types.at(type).erase(std::find(Zone::Types.at(type).begin(), Zone::Types.at(type).end(), id));
+		Counter.at(type).erase(std::find(Counter.at(type).begin(), Counter.at(type).end(), id));
     }
-        // std::vector<ZoneId>& v = Zone::Types.at(type);
-    Zone(void)
-    : id{0}, type{NONE}, location{Coord2D()}, capacity{0}, neighbours{{}} {}
+  public: // Methods
+    bool CanTraverse(void)      const { return type != ZoneType::PRODUCTION; }
+    bool IsOftenCongested(void) const { return (type != ZoneType::RESIDENTIAL) ? false : (neighbours.size() > 3); }
+    bool HasSpeedLimit(void)    const { return type != ZoneType::TRANSPORT; }
 
-  public: /* -- DATA ----------------------------------------------- */
-    const ZoneId id; // unique identifier
-    const Type type; // zone classifier
-  private:
-    Coord2D location; // map coordinates x, y
-    uint capacity;    // max population, determines the size of the zone
-  public:
-    std::vector< ZoneId > neighbours; // adjacent zones (compiler error for vector of const)
+    void AddNeighbour(ZoneId id)    { neighbours.emplace_back(id); }
+    void RemoveNeighbour(ZoneId id) { neighbours.erase(std::find(neighbours.begin(), neighbours.end(), id)); }
+  public: // Getters & Setters
+    std::vector< ZoneId > getNeighbours(void) { return neighbours; }
 
-  public: /* -- METHODS -- GET/SET --------------------------------- */
-    Coord2D getLocation(void) const { return location; }
-    Coord2D getCenter(void)   const { return location; } // justified ? should be abstract
-    float getCapacity(void) const { return capacity; }
-    float getRadius(void)   const { return sqrt(capacity); }
-
-    std::vector< ZoneId > getNeighbours(void) {
-        // for(auto x : neighbours)std::cout<<x<<',';std::cout<<'\n';
-        return neighbours; }
-
+    Coord2D getCenter(void) const { return location; }
+    float   getRadius(void) const { return sqrt(capacity); }
 
     void setCenter(Coord2D c) { location = c; }
     void setRadius(float r)   { capacity = r*r; }
 
-    void AddNeighbour(const ZoneId id)    { neighbours.emplace_back(id); } // and conditions...
-    void RemoveNeighbour(const ZoneId id) { neighbours.erase(std::find(neighbours.begin(), neighbours.end(), id)); }
+    Coord2D getLocation(void) const { return location; }
+    float   getCapacity(void) const { return capacity; }
+  public: // other :/ TODO
+    float Distance(const Coord2D& xy) { return DistanceFromCenter(xy) - getRadius(); }
+    float DistanceFromCenter(const Coord2D& xy) { return DistancePoint2Point(location, xy); }
+    float Distance(const Zone& zone) const {
+		return DistancePoint2Point(this->location, zone.location)
+             - this->getRadius() - zone.getRadius();
+	}
+  public: /* --- DATA ---------------------------------------------- */
+    const ZoneId id;     // unique identifier
+    const ZoneType type; // zone classifier
+  private:
+    Coord2D location; // map coordinates (x,y) of the zone's center
+    uint capacity;    // max population, determines the zone's radius
+    std::vector< ZoneId > neighbours; // ids of neighbouring zones
 
-  public: /* -- METHODS -- INFO ------------------------------------ */
-    bool CanTraverse(void)      const { return type != PRODUCTION; }
-    bool IsOftenCongested(void) const { return (type == RESIDENTIAL) ? (neighbours.size() > 3) : false; }
-    bool HasSpeedLimit(void)    const { return type != TRANSPORT; }
+	std::map< ZoneType, std::vector<ZoneId> >& Counter = Types;
 
-    std::string getInfoString(void) {
-        return ZoneType2String(type) + str(id) + "\nCapacity: "+ str(capacity);
+  private: /* -- UTILITY ------------------------------------------- */
+	static std::string enumZoneType2str(ZoneType type) {
+		switch(type) {
+			case ZoneType::PRODUCTION:  return "Production Zone";
+			case ZoneType::TRANSPORT:   return "Transport Hub";
+			case ZoneType::RESIDENTIAL: return "Residential Area" ;
+		}
+	}
+  public:
+    friend std::ostream& operator<<(std::ostream& os, const ZoneType& type) {
+        return os << enumZoneType2str(type);
     }
-  public: /* -- METHODS -------------------------------------------- */
-
-    float Distance(const Coord2D& xy) { return fDistancePoint2Point(location, xy) - getRadius(); }
-    float DistanceFromCenter(const Coord2D& xy) { return fDistancePoint2Point(location, xy); }
-    float Distance(const Zone& zone) const { return fDistancePoint2Point(this->location, zone.location)
-                                              - this->getRadius() - zone.getRadius(); }
-
+  public:
+	std::string getInfoString(void) const {
+        return enumZoneType2str(type) +' '+ str(id) + "\nCapacity: "+ str(capacity);
+    }
+    friend std::ostream& operator<<(std::ostream& os, const Zone& obj) {
+        return os << obj.id <<' '<< obj.location.x <<' '<< obj.location.y <<' '<< obj.capacity;
+    }
 };
+
+using ZoneType = Zone::ZoneType;
+
 
 #endif//ZONE_HPP

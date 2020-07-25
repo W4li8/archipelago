@@ -1,8 +1,11 @@
-using uint = unsigned int;
 #ifndef UTILITIES_H
 #define UTILITIES_H
+// #include <bits/stdc++.h>
 
 #include <algorithm>
+#include <limits>
+
+#include <float.h>
 using uint = unsigned int;
 
 
@@ -32,6 +35,12 @@ template<typename T> auto max(T&& val) { return std::forward<T>(val); }
 template<typename T0, typename T1, typename... Ts> auto max(T0&& a, T1&& b, Ts&&... vs) {
     return max((a > b) ? a : b, std::forward<Ts>(vs)...);
 }
+template<typename T> auto abs(T x) { return x < 0 ? -x : x; }
+template<typename T> auto sign(T x) { return x < 0 ? -1 : x > 0 ? 1 : 0; }
+template<typename T> auto clamp(T x, T a, T b) { return max(a, min(x, b)); }
+
+
+
 #include <string>
 #include <sstream>
 
@@ -51,17 +60,14 @@ inline std::string bsfn(double x) {
 
 	// out << (abs(x) < 100 ? "  " : "") << (abs(x) < 10 ? "  " : "");
 	out << (x < 0 ? "– " : "+ ");
-    out << std::fixed << abs(x);
+    out << std::fixed << ABS(x);
 
     return out.str();
 }
 template<typename T>
-std::string str(T x) { return std::to_string(x) + " "; }
-// std::string str(int x) { return std::to_string(x) + " "; }
-// std::string str(uint x) { return std::to_string(x) + " "; }
-// std::string str(float x) { return bsfn(x) + " "; }
-// std::string str(double x) { return bsfn(x) + " "; }
-// std::string str(bool x) { return x ? "1 " : "0 "; }
+std::string str(T x) { return std::to_string(x); }
+
+
 #define EPS 5
 #define S_SPEED 1.0f
 #define F_SPEED 2.0f

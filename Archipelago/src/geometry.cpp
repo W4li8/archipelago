@@ -17,23 +17,23 @@ bool operator==(const Coord3D& lhs, const Coord3D& rhs) { return lhs.x == rhs.x 
 
 
 //line from eq. ax + by + c = 0
-static double DistancePoint2Line(Coord2D P, double a, double b, double c) {
+static float DistancePoint2Line(Coord2D P, float a, float b, float c) {
 	return abs(a*P.x + b*P.y + c)/sqrt(a*a + b*b);
 }
-static double Norm(Vector2D v) {
+static float Norm(Vector2D v) {
 	return sqrt(v.x*v.x + v.y*v.y);
 }
 
 
 //dist(P,Q)
-double DistancePoint2Point(Coord2D P, Coord2D Q) {
-	// double dx{P.x - Q.x}, dy{P.y - Q.y};
+float DistancePoint2Point(Coord2D P, Coord2D Q) {
+	// float dx{P.x - Q.x}, dy{P.y - Q.y};
 	// return sqrt(dx*dx + dy*dy);
 	return Norm(Q-P);
 }
 
 //dist(P, [A,B])
-double DistancePoint2Segment(Coord2D P, Coord2D A, Coord2D B) {
+float DistancePoint2Segment(Coord2D P, Coord2D A, Coord2D B) {
     Vector2D PA = A-P;
     Vector2D AB = B-A;
     Vector2D BP = P-B;
@@ -43,7 +43,7 @@ double DistancePoint2Segment(Coord2D P, Coord2D A, Coord2D B) {
 		 :             DistancePoint2Line(P, A, B);
 }
 //dist(P, [A,B))
-double DistancePoint2Ray(Coord2D P, Coord2D A, Coord2D B) {
+float DistancePoint2Ray(Coord2D P, Coord2D A, Coord2D B) {
     Vector2D PA = A-P;
     Vector2D AB = B-A;
 
@@ -51,7 +51,7 @@ double DistancePoint2Ray(Coord2D P, Coord2D A, Coord2D B) {
 	     :             DistancePoint2Line(P, A, B);
 }
 // dist(P, (A,B))
-double DistancePoint2Line(Coord2D P, Coord2D A, Coord2D B) {
+float DistancePoint2Line(Coord2D P, Coord2D A, Coord2D B) {
 	// line equation between two points: y-y1 = (y2-y1)/(x2-x1) * (x-x1)
     return DistancePoint2Line(P, (A.y - B.y), (B.x - A.x), (A.x*B.y - B.x*A.y));
 }

@@ -8,16 +8,16 @@
 using Pencil = const Cairo::RefPtr<Cairo::Context>;
 
 struct Color {
-    Color(int red, int green, int blue, double alpha = 1.0)
-    : red{double(red)/255}, green{double(green)/255}, blue{double(blue)/255}, alpha{alpha} {}
-    Color(Color old, double alpha)
+    Color(int red, int green, int blue, float alpha = 1.0)
+    : red{float(red)/255}, green{float(green)/255}, blue{float(blue)/255}, alpha{alpha} {}
+    Color(Color old, float alpha)
     : red{old.red}, green{old.green}, blue{old.blue}, alpha{alpha} {}
 
 
-    constexpr Color(uint8_t r, uint8_t g, uint8_t b, double a)
+    constexpr Color(uint8_t r, uint8_t g, uint8_t b, float a)
         : red(r/255), green(g/255), blue(b/255), alpha(a) {}
 
-    double red, green, blue, alpha;
+    float red, green, blue, alpha;
 };
 
 const Color black {  0,  0,  0};

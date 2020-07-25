@@ -86,7 +86,7 @@ void ArchipelagoUI::SetupWidgets(void) {
 	editor_frame.set_label(" Archipelago Editor ");
 	editor_frame.set_label_align(0.02, 0.5);
 
-	tmpstuff.set_width_chars(22);
+	tmpstuff.set_width_chars(24);
 	tmpstuff.set_xalign(0.05);
 
 	btn_zone.set_image(img_zone);
@@ -106,7 +106,7 @@ void ArchipelagoUI::SetupWidgets(void) {
 	btn_add_menu.set_direction(Gtk::ARROW_UP);
 	add_menu.show_all();
 
-	mouse_pos.set_width_chars(22);
+	mouse_pos.set_width_chars(24);
 	mouse_pos.set_xalign(0.95);
 }
 
@@ -117,21 +117,22 @@ void ArchipelagoUI::ConnectSignals(void) {
 	btn_info.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::DisplayInfo_cb));
 
  	signal_key_press_event().connect(sigc::mem_fun(this, &ArchipelagoUI::KeyboardShortcuts_cb));
+
 	btn_open.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::OpenFile_cb));
 	btn_save.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::SaveFile_cb));
 
 	btn_view.signal_clicked().connect(sigc::mem_fun(*this, &ArchipelagoUI::ResetView_cb));
 
-	btn_zone.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::EditZone_cb));
-	btn_link.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::EditLink_cb));
+	btn_zone.signal_toggled()    .connect(sigc::mem_fun(*this, &ArchipelagoUI::EditZone_cb));
+	btn_link.signal_toggled()    .connect(sigc::mem_fun(*this, &ArchipelagoUI::EditLink_cb));
 	btn_add_menu.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::AddMenu_cb));
-	btn_add .signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Add_cb));
-	btn_edit.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Edit_cb));
-	btn_remove.signal_toggled().connect(sigc::mem_fun(*this, &ArchipelagoUI::Remove_cb));
+	btn_add .signal_toggled()    .connect(sigc::mem_fun(*this, &ArchipelagoUI::Add_cb));
+	btn_edit.signal_toggled()    .connect(sigc::mem_fun(*this, &ArchipelagoUI::Edit_cb));
+	btn_remove.signal_toggled()  .connect(sigc::mem_fun(*this, &ArchipelagoUI::Remove_cb));
 
-    ResidentialArea.signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), Zone::RESIDENTIAL));
-    TransportHub.signal_activate()	 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), Zone::TRANSPORT));
-    ProductionZone.signal_activate() .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), Zone::PRODUCTION));
+    ResidentialArea.signal_activate().connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), ZoneType::RESIDENTIAL));
+    TransportHub.signal_activate()	 .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), ZoneType::TRANSPORT));
+    ProductionZone.signal_activate() .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::AddMenuSelect_cb), ZoneType::PRODUCTION));
 
 	gesture_zoom = Gtk::GestureZoom::create(city_canvas);
 	gesture_zoom->signal_scale_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Zoom_cb));
@@ -140,9 +141,9 @@ void ArchipelagoUI::ConnectSignals(void) {
 	gesture_rotate->signal_angle_changed().connect(sigc::mem_fun(*this, &ArchipelagoUI::Rotate_cb));
 
 	gesture_drag = Gtk::GestureDrag::create(city_canvas);
-	gesture_drag->signal_drag_begin()   .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragBegin_cb));
-	gesture_drag->signal_drag_update()  .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragUpdate_cb));
-	gesture_drag->signal_drag_end()     .connect(sigc::mem_fun(*this, &ArchipelagoUI::DragEnd_cb));
+	gesture_drag->signal_drag_begin() .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::Drag_cb), Archipelago::EditState::INIT));
+	gesture_drag->signal_drag_update().connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::Drag_cb), Archipelago::EditState::UPDATE));
+	gesture_drag->signal_drag_end()   .connect(sigc::bind(sigc::mem_fun(*this, &ArchipelagoUI::Drag_cb), Archipelago::EditState::END));
 }
 
 
@@ -160,7 +161,7 @@ ArchipelagoUI::ArchipelagoUI() {
 	btn_add_menu.hide();
 
 	editor_action = Archipelago::EditorOptions::NONE;
-	add_menu_choice = Zone::Type::NONE;
+	// add_menu_choice = ZoneType::NONE;
 }
 
 #define GDK_COMMAND_MASK GDK_MOD2_MASK
@@ -170,11 +171,11 @@ bool ArchipelagoUI::KeyboardShortcuts_cb(GdkEventKey* event) {
 		btn_zone.set_active(1);
 		switch(gdk_keyval_to_upper(event->keyval)) {
 		  case GDK_KEY_P:
-			AddMenuSelect_cb(Zone::PRODUCTION); break;
+			AddMenuSelect_cb(ZoneType::PRODUCTION); break;
 		  case GDK_KEY_R:
-			AddMenuSelect_cb(Zone::RESIDENTIAL); break;
+			AddMenuSelect_cb(ZoneType::RESIDENTIAL); break;
 		  case GDK_KEY_T:
-		  	AddMenuSelect_cb(Zone::TRANSPORT); break;
+		  	AddMenuSelect_cb(ZoneType::TRANSPORT); break;
 		  case GDK_KEY_Return:
 		    btn_edit.set_active(1); break;
 		  case GDK_KEY_BackSpace:
@@ -284,21 +285,22 @@ void ArchipelagoUI::AddMenu_cb(void) {
 	}
 }
 
-void ArchipelagoUI::AddMenuSelect_cb(Zone::Type choice) {
+void ArchipelagoUI::AddMenuSelect_cb(ZoneType choice) {
 	add_menu_choice = choice;
+	editor_action = Archipelago::EditorOptions::ADD_ZONE;
 	btn_add.set_active(1);
 }
 
 void ArchipelagoUI::Add_cb(void) {
 	if(!btn_add.get_active()) {
-		add_menu_choice = Zone::Type::NONE;
+		// add_menu_choice = ZoneType::NONE;
 		editor_action = Archipelago::EditorOptions::NONE;
 		return ;
 	}
 	btn_edit.set_active(0);
 	btn_remove.set_active(0);
 
-	if(btn_zone.get_active() && add_menu_choice == Zone::Type::NONE) {
+	if(btn_zone.get_active() && editor_action == Archipelago::EditorOptions::NONE/*add_menu_choice == ZoneType::NONE*/ ) {
 		btn_add_menu.show();
 		btn_add_menu.set_active(1);
 		btn_add.hide();
@@ -342,8 +344,8 @@ bool ArchipelagoUI::on_scroll_event(GdkEventScroll *ev) {
     return 1;
 }
 
-void ArchipelagoUI::Rotate_cb(double now, double angle_delta) {
-    static double last{0};
+void ArchipelagoUI::Rotate_cb(float now, float angle_delta) {
+    static float last{0};
     if(abs(now) > 0.02) {
         city_canvas.Rotate(SIGN(now - last));
         RefreshMouseCoordinates();
@@ -351,8 +353,8 @@ void ArchipelagoUI::Rotate_cb(double now, double angle_delta) {
     last = now;
 }
 
-void ArchipelagoUI::Zoom_cb(double now) {
-    static double last{1};
+void ArchipelagoUI::Zoom_cb(float now) {
+    static float last{1};
     if(abs(now - 1) > 0.02) {
     	city_canvas.Scale(SIGN(now - last));
         RefreshMouseCoordinates();
@@ -360,71 +362,41 @@ void ArchipelagoUI::Zoom_cb(double now) {
 	last = now;
 }
 
-
-
-bool ArchipelagoUI::on_button_press_event(GdkEventButton *ev) {
+void ArchipelagoUI::Drag_cb(float dx, float dy, Archipelago::EditState state) {
     if(filepath.has_focus()) btn_open.grab_focus(); // one way to take focus off filepath entry
+	std::cout<<int(state)<<'\n';
+	int x, y; city_canvas.get_pointer(x, y);
+	Coord2D position = city_canvas.Pointer2ArchipelagoXY(x, y);
 
-	if(ev->button == 1) {
+	if(editor_action != Archipelago::EditorOptions::NONE) {
 		switch(editor_action) {
-		  case Archipelago::EditorOptions::ADD_ZONE:
-			city.AddZone(add_menu_choice, city_canvas.Pointer2ArchipelagoXY({ev->x, ev->y}));
+		  case Archipelago::EditorOptions::MODIFY_ZONE:
+			city.ModifyZone(position, state);
 			break;
-		  case Archipelago::EditorOptions::REMOVE_ZONE:
-		  	city.RemoveZone(city_canvas.Pointer2ArchipelagoXY({ev->x, ev->y}));
+		  case Archipelago::EditorOptions::ADD_LINK:
+			city.AddLink(position, state);
 			break;
-		  case Archipelago::EditorOptions::REMOVE_LINK:
-		  	city.RemoveLink(city_canvas.Pointer2ArchipelagoXY({ev->x, ev->y}));
-			break;
-		  default: ;
+		  default: // act as button release and cancel action if release is far from original press
+			if(state == Archipelago::EditState::END && abs(dx) < 5 && abs(dy) < 5) {
+				switch(editor_action) {
+				  case Archipelago::EditorOptions::ADD_ZONE:
+					city.AddZone(add_menu_choice, position);
+					break;
+				  case Archipelago::EditorOptions::REMOVE_ZONE:
+					city.RemoveZone(position);
+					break;
+				  case Archipelago::EditorOptions::REMOVE_LINK:
+					city.RemoveLink(position);
+					break;
+			      default: ;
+				}
+			}
 		}
+		city.ComputePerformance();
+		city_rating.set_markup(city.performance);
+	} else {
+		city.ShortestPath(state, position);
 	}
-	return 1;
-}
-
-
-void ArchipelagoUI::DragBegin_cb(double x, double y) {
-	dispinfo = 1;
-	switch(editor_action) {
-	  case Archipelago::EditorOptions::MODIFY_ZONE:
-	  	city.ModifyZone(city_canvas.Pointer2ArchipelagoXY({x, y}), Archipelago::EditState::INIT); break;
-	  case Archipelago::EditorOptions::ADD_LINK:
-	  	city.AddLink(city_canvas.Pointer2ArchipelagoXY({x, y}), Archipelago::EditState::INIT); break;
-	  default:
-		city.ShortestPath(city_canvas.Pointer2ArchipelagoXY({x, y}), Archipelago::EditState::INIT);
-	}
-}
-
-void ArchipelagoUI::DragUpdate_cb(double dx, double dy) {
-	double x, y; gesture_drag->get_start_point(x, y);
-	switch(editor_action) {
-	  case Archipelago::EditorOptions::MODIFY_ZONE:
-	  	// city.ModifyZone(city_canvas.Pointer2ArchipelagoXY({x, y}), Archipelago::EditState::UPDATE, city_canvas.Pointer2ArchipelagoXY({dx, dy}));
-	  	city.ModifyZone(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::UPDATE);
-	  	// tmpstuff.set_markup("<span size=\"smaller\""> + city.edit_text + "</span>");
-		break;
-	  case Archipelago::EditorOptions::ADD_LINK:
-	  	// city.AddLink(city_canvas.Pointer2ArchipelagoXY({x, y}), Archipelago::EditState::UPDATE, city_canvas.Pointer2ArchipelagoXY({dx, dy}));
-	  	city.AddLink(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::UPDATE);
-		// tmpstuff.set_text(city.getAddLinkInfo());
-		break;
-	  default:
-		city.ShortestPath(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::UPDATE);
-	}
-	tmpstuff.set_markup("<span size=\"smaller\">" + city.edit_text + "</span>");
-}
-
-void ArchipelagoUI::DragEnd_cb(double dx, double dy) {
-	double x, y; gesture_drag->get_start_point(x, y);
-	switch(editor_action) {
-	  case Archipelago::EditorOptions::MODIFY_ZONE:
-	    city.ModifyZone(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END); break;
-	  case Archipelago::EditorOptions::ADD_LINK:
-	  	city.AddLink(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END); break;
-	  default:
-	  	city.ShortestPath(city_canvas.Pointer2ArchipelagoXY({x+dx, y+dy}), Archipelago::EditState::END);
-	}
-	dispinfo = 0;
 }
 
 
@@ -456,15 +428,16 @@ void ArchipelagoUI::ResetEditor(void) {
 
 void ArchipelagoUI::RefreshMouseCoordinates() {
     int x, y; city_canvas.get_pointer(x, y);
-    Coord2D mouse = city_canvas.Pointer2ArchipelagoXY({double(x), double(y)});
+    Coord2D mouse = city_canvas.Pointer2ArchipelagoXY(double(x), double(y));
 
-	auto dbl2str = [](double a) {
+	auto dbl2str = [](float a) {
 		std::ostringstream out;
 		out.precision(2);
 		out << (abs(a) < 10 ? "   " : abs(a) < 100 ? "  " : abs(a) < 1000 ? " " : "");
 		out << std::fixed << (a < 0 ? "-" : "+") << abs(a);
 		return out.str();
 	};
+	// display coordinates of zone center during edit
     mouse_pos.set_markup("<span font_family=\'Fira Code\' size=\"smaller\"><b>X:</b>"
 						+ dbl2str(mouse.x) +" <b>Y:</b>"+ dbl2str(mouse.y) +"</span> ");
 
