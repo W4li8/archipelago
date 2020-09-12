@@ -7,18 +7,17 @@
 #include <cmath>
 #include <fstream>
 #include <vector>
-#include "archipelago-bg.hpp"
-#include "graphics.hpp"
+#include "archipelago_backend.hpp"
 #include "geometry.hpp"
 
-Archipelago::Archipelago(void)
-: Ox{0}, Oy{0}, S{1}, Rz{0}, Tx{0}, Ty{0}
+ArchipelagoBackend::ArchipelagoBackend(void)
+// : Ox{0}, Oy{0}, S{1}, Rz{0}, Tx{0}, Ty{0}
 // , zone_edit{ZoneEdit::NONE}, link_edit{LinkEdit::NONE}
-, selectedzone{0} {
+: selectedzone{0} {
     OpenFile("test2.txt");
 }
 
-bool Archipelago::OpenFile(std::string filename) {
+bool ArchipelagoBackend::OpenFile(std::string filename) {
     std::ifstream file{filename};
     if(!file.is_open()) return 0;
 
@@ -63,7 +62,7 @@ bool Archipelago::OpenFile(std::string filename) {
     return 1;
 }
 
-bool Archipelago::SaveFile(std::string filename) {
+bool ArchipelagoBackend::SaveFile(std::string filename) {
     std::ofstream file{filename};
     if(!file.is_open()) return 0;
 
@@ -84,7 +83,7 @@ bool Archipelago::SaveFile(std::string filename) {
     return 1;
 }
 
-bool Archipelago::SpacePermitsZone(Coord2D center, float radius, uint ignore) {
+bool ArchipelagoBackend::SpacePermitsZone(Coord2D center, float radius, uint ignore) {
 
     for(auto& [id, zone] : zones) {
         if(id != ignore && DistancePoint2Point(zone.getCenter(), center) < (zone.getRadius() + radius)) {
@@ -100,34 +99,34 @@ bool Archipelago::SpacePermitsZone(Coord2D center, float radius, uint ignore) {
     return true;
 }
 
-bool Archipelago::SpacePermitsZone(const Zone& z0) {
+bool ArchipelagoBackend::SpacePermitsZone(const Zone& z0) {
     return SpacePermitsZone(z0.getCenter(), z0.getRadius(), z0.id);
 }
 
-void Archipelago::CreateZone(ZoneType zonetype, Coord2D pos, uint nb_people, uint id) {
+void ArchipelagoBackend::CreateZone(ZoneType zonetype, Coord2D pos, uint nb_people, uint id) {
     static uint max_id{0};
     //TODO: params validation check
     if(SpacePermitsZone(pos, sqrt(nb_people))) {
         id ? max_id = MAX(id, max_id) : id = ++max_id;
 
         zones.try_emplace(id, id, zonetype, pos, nb_people);
-        queue_draw();
+        // queue_draw();
     }
 }
 
 
 
-void Archipelago::DestroyZone(ZoneId id) {
+void ArchipelagoBackend::DestroyZone(ZoneId id) {
 
     for(auto zone : zones.at(id).getNeighbours()) {
         DisconnectZones(id, zone);
     }
     zones.erase(id);
-    queue_draw();
+    // queue_draw();
 }
 
 
-bool Archipelago::SpacePermitsLink(ZoneId id1, ZoneId id2) {
+bool ArchipelagoBackend::SpacePermitsLink(ZoneId id1, ZoneId id2) {
 
     for(auto& [id, zone] : zones) {
         if(id != id1 && id != id2 && DistancePoint2Segment(zone.getCenter(), zones.at(id1).getCenter(), zones.at(id2).getCenter()) < zone.getRadius()) {
@@ -138,13 +137,13 @@ bool Archipelago::SpacePermitsLink(ZoneId id1, ZoneId id2) {
     }
     return true;
 }
-bool Archipelago::LinkAllowed(ZoneId id1, ZoneId id2) {
+bool ArchipelagoBackend::LinkAllowed(ZoneId id1, ZoneId id2) {
     return zones.count(id1) && zones.count(id2)
         && (not zones.at(id1).IsOftenCongested()) and (not zones.at(id2).IsOftenCongested());
 }
 
 
-void Archipelago::ConnectZones(ZoneId id1, ZoneId id2) {
+void ArchipelagoBackend::ConnectZones(ZoneId id1, ZoneId id2) {
 
     if(LinkAllowed(id1, id2) and SpacePermitsLink(id1, id2)) {
 
@@ -152,77 +151,77 @@ void Archipelago::ConnectZones(ZoneId id1, ZoneId id2) {
         zones.at(id2).AddNeighbour(id1);
 
         links.try_emplace({id1, id2}, zones.at(id1), zones.at(id2));
-        queue_draw();
+        // queue_draw();
     }
 }
 
-void Archipelago::DisconnectZones(ZoneId id1, ZoneId id2) {
+void ArchipelagoBackend::DisconnectZones(ZoneId id1, ZoneId id2) {
 
     zones.at(id1).RemoveNeighbour(id2);
     zones.at(id2).RemoveNeighbour(id1);
 
     links.erase({id1, id2});
-    queue_draw();
+    // queue_draw();
 }
 
 
 
 
-void Archipelago::Scale(float sign) {
-    static float zoom{1};
-    if(S == 1) zoom = 1; // for smooth view reset
+// void ArchipelagoBackend::Scale(float sign) {
+//     static float zoom{1};
+//     if(S == 1) zoom = 1; // for smooth view reset
 
-    zoom = CLAMP(zoom*(1 + sign*0.02), 0.1326, 7.2446);
-    // slightly adapt view to windows size
-    S = CLAMP(zoom*MIN(width, height)/500, 0.3, 3);
-    queue_draw();
-}
+//     zoom = CLAMP(zoom*(1 + sign*0.02), 0.1326, 7.2446);
+//     // slightly adapt view to windows size
+//     S = CLAMP(zoom*MIN(width, height)/500, 0.3, 3);
+//     // queue_draw();
+// }
 
-void Archipelago::Rotate(float sign) {
-    static float deg{0};
-    if(Rz == 0) deg = 0; // for smooth view reset
+// void ArchipelagoBackend::Rotate(float sign) {
+//     static float deg{0};
+//     if(Rz == 0) deg = 0; // for smooth view reset
 
-    deg = std::fmod(deg + sign, 360);
-    // convert to radians for direct use
-    Rz = 2*deg*M_PI/180;
-    queue_draw();
-}
+//     deg = std::fmod(deg + sign, 360);
+//     // convert to radians for direct use
+//     Rz = 2*deg*M_PI/180;
+//     // queue_draw();
+// }
 
-void Archipelago::Translate(float dx, float dy) {
-    Tx -= dx;
-    Ty -= dy;
-    queue_draw();
-}
+// void ArchipelagoBackend::Translate(float dx, float dy) {
+//     Tx -= dx;
+//     Ty -= dy;
+//     // queue_draw();
+// }
 
-void Archipelago::Origin(void) {
-    Gtk::Allocation allocation = get_allocation();
-    width = allocation.get_width();
-    height = allocation.get_height();
+// void ArchipelagoBackend::Origin(void) {
+//     Gtk::Allocation allocation = get_allocation();
+//     width = allocation.get_width();
+//     height = allocation.get_height();
 
-    Ox = width/2;
-    Oy = height/2;
-    queue_draw();
-}
+//     Ox = width/2;
+//     Oy = height/2;
+//     // queue_draw();
+// }
 
-void Archipelago::UpdateViewModifiers(void) {
-    // Ox, Oy and S depend on window size
-    Origin();
-    Scale();
-    // Tx, Ty and Rz are unchanged
-}
+// void ArchipelagoBackend::UpdateViewModifiers(void) {
+//     // Ox, Oy and S depend on window size
+//     Origin();
+//     Scale();
+//     // Tx, Ty and Rz are unchanged
+// }
 
-void Archipelago::ResetViewModifiers(void) {
-    Origin();
-    S  = 1;
-    Rz = 0;
-    Tx = 0;
-    Ty = 0;
-    queue_draw();
-}
+// void ArchipelagoBackend::ResetView(void) {
+//     Origin();
+//     S  = 1;
+//     Rz = 0;
+//     Tx = 0;
+//     Ty = 0;
+//     // queue_draw();
+// }
 
 //##########################   EDITOR    #################################
 
-ZoneId Archipelago::IdentifyZone(Coord2D xy) {
+ZoneId ArchipelagoBackend::IdentifyZone(Coord2D xy) {
     for(auto& [id, zone] : zones) {
         if(DistancePoint2Point(xy, zone.getCenter()) < zone.getRadius()) {
             return id;
@@ -231,7 +230,7 @@ ZoneId Archipelago::IdentifyZone(Coord2D xy) {
     return 0;
 }
 
-LinkId Archipelago::IdentifyLink(Coord2D xy) {
+LinkId ArchipelagoBackend::IdentifyLink(Coord2D xy) {
     for(auto& [idx, link] : links) {
         if(DistancePoint2Segment(xy, link[A].getCenter(), link[B].getCenter()) < EPS) {
             return idx;
@@ -241,10 +240,10 @@ LinkId Archipelago::IdentifyLink(Coord2D xy) {
 }
 
 
-void Archipelago::AddZone(ZoneType type, Coord2D xy, uint capacity, uint id) {
+void ArchipelagoBackend::AddZone(ZoneType type, Coord2D xy, uint capacity, uint id) {
     CreateZone(type, xy, capacity, id);
 }
-void Archipelago::ModifyZone(Coord2D xy, EditState state) {
+void ArchipelagoBackend::ModifyZone(Coord2D xy, EditState state) {
     static Vector2D offset; // visual selection gap
 
     static Coord2D c_backup; // static Circle2D() ? in shape.hpp
@@ -293,17 +292,17 @@ void Archipelago::ModifyZone(Coord2D xy, EditState state) {
         break;
     }
     ShortestPath(EditState::UPDATE);
-    queue_draw();
+    // queue_draw();
 }
-void Archipelago::RemoveZone(Coord2D xy) {
-    auto id = IdentifyZone(xy);
+void ArchipelagoBackend::RemoveZone(Coord2D xy) {
+    ZoneId id = IdentifyZone(xy);
     if(id) {
         DestroyZone(id);
     }
 }
 
 
-void Archipelago::AddLink(Coord2D xy, EditState state) {
+void ArchipelagoBackend::AddLink(Coord2D xy, EditState state) {
     if(state != EditState::INIT && link_edit == LinkEdit::NONE) return ;
 
     ZoneId id = IdentifyZone(xy);
@@ -327,9 +326,9 @@ void Archipelago::AddLink(Coord2D xy, EditState state) {
         link_edit = LinkEdit::NONE;
         break;
     }
-    queue_draw();
+    // queue_draw();
 }
-void Archipelago::RemoveLink(Coord2D xy) {
+void ArchipelagoBackend::RemoveLink(Coord2D xy) {
     if(!IdentifyZone(xy)) {
         LinkId idx = IdentifyLink(xy);
         if(idx) {
@@ -338,104 +337,103 @@ void Archipelago::RemoveLink(Coord2D xy) {
     }
 }
 
-bool Archipelago::on_draw(const Cairo::RefPtr<Cairo::Context>& cr) {
+// bool ArchipelagoBackend::on_draw(const Cairo::RefPtr<Cairo::Context>& cr) {
 
-    UpdateViewModifiers();
+//     UpdateViewModifiers();
 
-    cr->save();
-    // Fill background (default: black border, white background)
-    DrawQuadrilateral(cr, {{0, 0}, {width, 0}, {width, height}, {0, height}});
-    // Setup drawing for Archipelago coordinates
-    cr->translate(Ox + Tx, Oy + Ty);
-    cr->rotate(Rz);
-    cr->scale(S, -S);
+//     cr->save();
+//     // Fill background (default: black border, white background)
+//     DrawQuadrilateral(cr, {{0, 0}, {width, 0}, {width, height}, {0, height}});
+//     // Setup drawing for ArchipelagoBackend coordinates
+//     cr->translate(Ox + Tx, Oy + Ty);
+//     cr->rotate(Rz);
+//     cr->scale(S, -S);
 
-    for(auto& [idx, link] : links) {
-        DrawLink(cr, link);
-    }
-    if(link_edit == LinkEdit::ADD) {
-        DrawSegment(cr, {zones.at(selectedzone).getCenter(), cursor});
-    }
+//     for(auto& [idx, link] : links) {
+//         DrawLink(cr, link);
+//     }
+//     if(link_edit == LinkEdit::ADD) {
+//         DrawSegment(cr, {zones.at(selectedzone).getCenter(), cursor});
+//     }
 
-    for(auto& [id, zone] : zones) {
-        DrawZone(cr, zone);
-    }
-    if(zone_edit == ZoneEdit::RESIZE) {
-        // cr->set_line_width(2);
-        DrawCircle(cr, {zones.at(selectedzone).getCenter(), zones.at(selectedzone).getRadius()}, black, {white, 0.0});
-    }
-    if(zone_edit == ZoneEdit::MOVE) {
-        Coord2D c{zones.at(selectedzone).getCenter()}; float r015{0.15f*zones.at(selectedzone).getRadius()};
-        // cr->set_line_width(2);
-        DrawSegment(cr, {{c + Coord2D(-r015, -r015)}, {c + Coord2D(r015, r015)}});
-        DrawSegment(cr, {{c + Coord2D(-r015, r015)}, {c + Coord2D(r015, -r015)}});
-    }
-    cr->restore();
-    return 1; // return 1 stops event propagation
-}
+//     for(auto& [id, zone] : zones) {
+//         DrawZone(cr, zone);
+//     }
+//     if(zone_edit == ZoneEdit::RESIZE) {
+//         // cr->set_line_width(2);
+//         DrawCircle(cr, {zones.at(selectedzone).getCenter(), zones.at(selectedzone).getRadius()}, black, {white, 0.0});
+//     }
+//     if(zone_edit == ZoneEdit::MOVE) {
+//         Coord2D c{zones.at(selectedzone).getCenter()}; float r015{0.15f*zones.at(selectedzone).getRadius()};
+//         // cr->set_line_width(2);
+//         DrawSegment(cr, {{c + Coord2D(-r015, -r015)}, {c + Coord2D(r015, r015)}});
+//         DrawSegment(cr, {{c + Coord2D(-r015, r015)}, {c + Coord2D(r015, -r015)}});
+//     }
+//     cr->restore();
+//     return 1; // return 1 stops event propagation
+// }
 
-void Archipelago::DrawLink(const Cairo::RefPtr<Cairo::Context>& cr, const Link& link) {
+// void ArchipelagoBackend::DrawLink(const Cairo::RefPtr<Cairo::Context>& cr, const Link& link) {
 
-    // cr->save();
-    cr->set_line_width(link.getSpeedLimit()*1.2);
-    DrawSegment(cr, {link[A].getCenter(), link[B].getCenter()},
-                    (link.getSpeedLimit() == F_SPEED) ? (link.marked ? red : green)
-                                                      : (link.marked ? orange : black));
-    cr->set_line_width(1);
-    // cr->restore();
-}
+//     // cr->save();
+//     cr->set_line_width(link.getSpeedLimit()*1.2);
+//     DrawSegment(cr, {link[A].getCenter(), link[B].getCenter()},
+//                     (link.getSpeedLimit() == F_SPEED) ? (link.marked ? red : green)
+//                                                       : (link.marked ? orange : black));
+//     cr->set_line_width(1);
+//     // cr->restore();
+// }
 
-void Archipelago::DrawZone(const Cairo::RefPtr<Cairo::Context>& cr, const Zone& zone) {
-    Coord2D c{zone.getCenter()}; float r{zone.getRadius()};
+// void ArchipelagoBackend::DrawZone(const Cairo::RefPtr<Cairo::Context>& cr, const Zone& zone) {
+//     Coord2D c{zone.getCenter()}; float r{zone.getRadius()};
 
-    // cr->save();
-    switch(zone.type) {
-      case ZoneType::PRODUCTION: {
-        float r012 = 0.12*r; float r070 = 0.70*r;
-        DrawCircle(cr, {c, r}, black, red);
+//     // cr->save();
+//     switch(zone.type) {
+//       case ZoneType::PRODUCTION: {
+//         float r012 = 0.12*r; float r070 = 0.70*r;
+//         DrawCircle(cr, {c, r}, black, red);
 
-        DrawQuadrilateral(cr, {{c.x - r070, c.y - r012}, {c.x + r070, c.y - r012},
-                               {c.x + r070, c.y + r012}, {c.x - r070, c.y + r012}}, white);
-      } break;
-      case ZoneType::RESIDENTIAL: {
-        float r038 = 0.5*0.75*r; float r065 = 0.5*sqrt(3)*0.75*r; float r075 = 0.75*r;
-        float r030 = 0.5*0.60*r; float r052 = 0.5*sqrt(3)*0.60*r; float r060 = 0.60*r;
-        DrawCircle(cr, {c, r}, white);
-        DrawCircle(cr, {c, r}, blue, {0,0,255,0.5});
+//         DrawQuadrilateral(cr, {{c.x - r070, c.y - r012}, {c.x + r070, c.y - r012},
+//                                {c.x + r070, c.y + r012}, {c.x - r070, c.y + r012}}, white);
+//       } break;
+//       case ZoneType::RESIDENTIAL: {
+//         float r038 = 0.5*0.75*r; float r065 = 0.5*sqrt(3)*0.75*r; float r075 = 0.75*r;
+//         float r030 = 0.5*0.60*r; float r052 = 0.5*sqrt(3)*0.60*r; float r060 = 0.60*r;
+//         DrawCircle(cr, {c, r}, white);
+//         DrawCircle(cr, {c, r}, blue, {0,0,255,0.5});
 
-        DrawTriangle(cr, {{c.x, c.y - r075}, {c.x - r065, c.y + r038}, {c.x + r065, c.y + r038}}, white);
-        DrawTriangle(cr, {{c.x, c.y + r075}, {c.x - r065, c.y - r038}, {c.x + r065, c.y - r038}}, white);
-        DrawTriangle(cr, {{c.x, c.y - r060}, {c.x - r052, c.y + r030}, {c.x + r052, c.y + r030}}, pink, pink);
-        DrawTriangle(cr, {{c.x, c.y + r060}, {c.x - r052, c.y - r030}, {c.x + r052, c.y - r030}}, pink, pink);
-      } break;
-      case ZoneType::TRANSPORT: {
-        float r071 = M_SQRT1_2*r;
-        DrawCircle(cr, {c, r}, white);
-        cr->set_line_width(4);
-        DrawCircle(cr, {c, r}, lgreen, {lgreen,0.2});
-        cr->set_line_width(1);
+//         DrawTriangle(cr, {{c.x, c.y - r075}, {c.x - r065, c.y + r038}, {c.x + r065, c.y + r038}}, white);
+//         DrawTriangle(cr, {{c.x, c.y + r075}, {c.x - r065, c.y - r038}, {c.x + r065, c.y - r038}}, white);
+//         DrawTriangle(cr, {{c.x, c.y - r060}, {c.x - r052, c.y + r030}, {c.x + r052, c.y + r030}}, pink, pink);
+//         DrawTriangle(cr, {{c.x, c.y + r060}, {c.x - r052, c.y - r030}, {c.x + r052, c.y - r030}}, pink, pink);
+//       } break;
+//       case ZoneType::TRANSPORT: {
+//         float r071 = M_SQRT1_2*r;
+//         DrawCircle(cr, {c, r}, white);
+//         cr->set_line_width(4);
+//         DrawCircle(cr, {c, r}, lgreen, {lgreen,0.2});
+//         cr->set_line_width(1);
 
-        DrawSegment(cr, {{c.x + r, c.y}, {c.x - r, c.y}}, lgreen);
-        DrawSegment(cr, {{c.x + r071, c.y + r071}, {c.x - r071, c.y - r071}}, lgreen);
-        DrawSegment(cr, {{c.x, c.y + r}, {c.x, c.y - r}}, lgreen);
-        DrawSegment(cr, {{c.x - r071, c.y + r071}, {c.x + r071, c.y - r071}}, lgreen);
-      } break;
-      default:;
-    }
-    // cr->restore();
-}
+//         DrawSegment(cr, {{c.x + r, c.y}, {c.x - r, c.y}}, lgreen);
+//         DrawSegment(cr, {{c.x + r071, c.y + r071}, {c.x - r071, c.y - r071}}, lgreen);
+//         DrawSegment(cr, {{c.x, c.y + r}, {c.x, c.y - r}}, lgreen);
+//         DrawSegment(cr, {{c.x - r071, c.y + r071}, {c.x + r071, c.y - r071}}, lgreen);
+//       } break;
+//       default:;
+//     }
+//     // cr->restore();
+// }
 
-void Archipelago::ClearCity(void) {
+void ArchipelagoBackend::ClearCity(void) {
     links.clear();
     zones.clear();
-    ResetViewModifiers();
 }
 
 
 
 
 
-std::string Archipelago::InfoFromCoordinates(Coord2D xy) {
+std::string ArchipelagoBackend::InfoFromCoordinates(Coord2D xy) {
 
     ZoneId id = IdentifyZone(xy);
     if(id) return zones.at(id).getInfoString();
@@ -446,13 +444,13 @@ std::string Archipelago::InfoFromCoordinates(Coord2D xy) {
     return "";
 }
 
-Coord2D Archipelago::Pointer2ArchipelagoXY(double mx, double my) {
-    return {float( 1/S*(cos(Rz)*(mx - Ox - Tx) + sin(Rz)*(my - Oy - Ty))),
-            float(-1/S*(cos(Rz)*(my - Oy - Ty) - sin(Rz)*(mx - Ox - Tx)))};
-}
+// Coord2D ArchipelagoBackend::MouseToArchipelagoXY(double mx, double my) {
+//     return {float( 1/S*(cos(Rz)*(mx - Ox - Tx) + sin(Rz)*(my - Oy - Ty))),
+//             float(-1/S*(cos(Rz)*(my - Oy - Ty) - sin(Rz)*(mx - Ox - Tx)))};
+// }
 
 
-void Archipelago::ComputePerformance(void) {
+void ArchipelagoBackend::ComputePerformance(void) {
     static int i{0};
     std::cout<<i++<<" UPDATE PERFORMANCE\n";
 
@@ -465,7 +463,7 @@ void Archipelago::ComputePerformance(void) {
     // std::cout <<"MTA "<<MTA<<'\n';
 }
 
-float Archipelago::ComputeENJ(void) {
+float ArchipelagoBackend::ComputeENJ(void) {
     int result{0}, normalize{0};
     for(auto [type, zonelist] : Zone::Types) {
         uint tmp{0};
@@ -491,7 +489,7 @@ float Archipelago::ComputeENJ(void) {
     return float(result)/float(normalize);
 }
 
-float Archipelago::ComputeCI(void) {
+float ArchipelagoBackend::ComputeCI(void) {
     float result{0};
     for(auto& [idx, link] : links) {
         result += link.getDistance()*min(link[A].getCapacity(), link[B].getCapacity())*link.getSpeedLimit();
@@ -500,31 +498,23 @@ float Archipelago::ComputeCI(void) {
     return result;
 }
 
-float Archipelago::ComputeMTA(void) {
+float ArchipelagoBackend::ComputeMTA(void) {
     float result{0};
     for(auto id : Zone::Types.at(ZoneType::RESIDENTIAL)) {
-        // std::cout<<"LOOP-2\n";
         for(auto [type, zonelist] : Zone::Types) {
-            // std::cout<<"LOOP-1\n";
             if(type != ZoneType::RESIDENTIAL) {
-                // std::cout<<"loop id! "<<id<<'\n';
                 for(auto idx : Dijkstra(id, zonelist)) {
-                // std::cout <<'\n';
-                    // if(idx) {
-                        result += links.at(idx).getTravelTime();
-                    // }
+                    result += links.at(idx).getTravelTime();
                 }
             }
-            // std::cout<<"LOOP+1\n";
         }
-        // std::cout<<"LOOP+2\n";
     }
     std::cout<<"DONE MTA\n";
     return result/Zone::Types.at(ZoneType::RESIDENTIAL).size();
 }
 
 
-std::vector<LinkId> Archipelago::Dijkstra(const ZoneId zi, const std::vector<ZoneId> zf) {
+std::vector<LinkId> ArchipelagoBackend::Dijkstra(const ZoneId zi, const std::vector<ZoneId> zf) {
 
     struct DijkstraNode {
         bool  visited; // has it the zone been visited by the algorithm
@@ -534,7 +524,8 @@ std::vector<LinkId> Archipelago::Dijkstra(const ZoneId zi, const std::vector<Zon
         DijkstraNode(bool yn): visited{0}, stop{yn}, time{FLT_MAX}, prev{0} {}
     };
     std::map< uint, DijkstraNode > DijkstraGraph;
-    // Trick with auto doesn't work for recursive lambdas
+    // Generates a graph of all zones accessible from a zone
+    // NB: need to specify type, trick with auto doesn't work for recursive lambdas
     std::function< void(ZoneId) > ZoneAccessGraph = [this, &ZoneAccessGraph, &DijkstraGraph](ZoneId id) {
         DijkstraGraph.try_emplace(id, !zones.at(id).CanTraverse());
         for(auto zone : zones.at(id).getNeighbours()) {
@@ -590,7 +581,7 @@ std::vector<LinkId> Archipelago::Dijkstra(const ZoneId zi, const std::vector<Zon
     return std::vector<LinkId>{};
 }
 
-void Archipelago::ShortestPath(EditState state, Coord2D position) {
+void ArchipelagoBackend::ShortestPath(EditState state, Coord2D position) {
     static ZoneId z1{0}, z2{0};
 
     switch(state) {
@@ -619,5 +610,5 @@ void Archipelago::ShortestPath(EditState state, Coord2D position) {
         }
         break;
     }
-    queue_draw();
+    // queue_draw();
 }

@@ -44,7 +44,7 @@ template<typename T> auto clamp(T x, T a, T b) { return max(a, min(x, b)); }
 #include <string>
 #include <sstream>
 
-inline std::string StripPathFromfilepath(std::string filepath) {
+inline std::string StripPathFromFilePath(std::string filepath) {
 	for(auto it = find(filepath.begin(), filepath.end(), '/'); it < filepath.end();
         it = find(filepath.begin(), filepath.end(), '/')) {
 		filepath.erase(filepath.begin(), it+1); // strip directory

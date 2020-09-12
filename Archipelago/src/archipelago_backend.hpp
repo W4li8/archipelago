@@ -1,8 +1,7 @@
-#ifndef ARCHIPELAGO
-#define ARCHIPELAGO
+#ifndef ARCHIPELAGO_BACKEND
+#define ARCHIPELAGO_BACKEND
 
 
-#include <gtkmm/drawingarea.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -10,14 +9,18 @@
 #include "link.hpp"
 #include "zone.hpp"
 
-class Archipelago : public Gtk::DrawingArea {
+// differentiate archipelago drawing with archipelago "bg" the latter in charge of editor and fileIO, the other of view modifiers inherits from "bg" or is friend
+class ArchipelagoBackend {
   public: /* --- DEFINITIONS --------------------------------------- */
-	enum class EditorOptions { NONE, ADD_ZONE, MODIFY_ZONE, REMOVE_ZONE, ADD_LINK, REMOVE_LINK };
-	enum class EditState 	 { INIT, UPDATE, END };
+	enum class EditorOptions { NONE, ADD_ZONE, MODIFY_ZONE, REMOVE_ZONE, ADD_LINK, REMOVE_LINK } editor_action;
+	enum class EditState     { INIT, UPDATE, END };
 
+	// enum class ZoneEdit { NONE, ADD, MOVE, RESIZE, REMOVE } zone_edit;
+	// enum class LinkEdit { NONE, ADD, REMOVE } link_edit;
+	ZoneType add_menu_choice; // IN backend
 
   public: // constructors etc.
-    Archipelago(void);
+    ArchipelagoBackend(void);
 
 
   public:
@@ -65,20 +68,20 @@ class Archipelago : public Gtk::DrawingArea {
 	void DisconnectZones(LinkId id);
 
 	// origin, scale, rotation, translation
-	float Ox, Oy, S, Rz, Tx, Ty;
-	void Origin(void); // TODO:add positionsibility to fix at x,y
-	void Scale(float sign = 0);
-	void Rotate(float sign = 0);
-	void Translate(float dx = 0, float dy = 0);
-	void UpdateViewModifiers(void);
-	void ResetViewModifiers(void);
+	// float Ox, Oy, S, Rz, Tx, Ty;
+	// void Origin(void); // TODO:add positionsibility to fix at x,y
+	// void Scale(float sign = 0);
+	// void Rotate(float sign = 0);
+	// void Translate(float dx = 0, float dy = 0);
+	// void UpdateViewModifiers(void);
+	// void ResetView(void);
 
-	void DrawZone(const Cairo::RefPtr<Cairo::Context>& cr, const Zone& zone);
-	void DrawLink(const Cairo::RefPtr<Cairo::Context>& cr, const Link& link);
-    virtual bool on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) override;
+	// void DrawZone(const Cairo::RefPtr<Cairo::Context>& cr, const Zone& zone);
+	// void DrawLink(const Cairo::RefPtr<Cairo::Context>& cr, const Link& link);
+    // virtual bool on_draw(const Cairo::RefPtr<Cairo::Context>& pencil) override;
 
 	std::string InfoFromCoordinates(Coord2D position);
-	Coord2D Pointer2ArchipelagoXY(double mx, double my);
+	// Coord2D MouseToArchipelagoXY(double mx, double my);
 
 
 
@@ -105,23 +108,4 @@ class Archipelago : public Gtk::DrawingArea {
 
 };
 
-#endif//ARCHIPELAGO
-
-
-	// struct Link {
-	// 	// std::shared_ptr<Zone> z1, z2;
-	// 	// std::tuple<std::shared_ptr<Zone>, std::shared_ptr<Zone>> getZones() {
-	// 	// 	return {z1, z2};
-	// 	// }
-
-	// 	float speed, distance, time;
-	// 	std::tuple<float&, float&, float&> getInfo() {
-	// 		return {speed, distance, time};
-	// 	}
-
-	// 	Link(/*std::shared_ptr<Zone> z1, std::shared_ptr<Zone> z2,*/ float v, float d)
-	// 	// : z1{z1}, z2{z2}
-	// 	, speed{v}, distance{d}, time{d/v}
-	// 	, marked{0} {}
-	// 	bool marked;
-	// };
+#endif//ARCHIPELAGO_BACKEND
